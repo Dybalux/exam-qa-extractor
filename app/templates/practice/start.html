@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Iniciar práctica — ExamOCR{% endblock %}
+{% block page_title %}Iniciar práctica{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Configurá tu sesión de estudio</p>{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:520px">
+  <div class="card-body">
+    <form method="POST" action="/practice">
+      <div class="form-group">
+        <label class="form-label">Modo de práctica</label>
+        <div style="display:flex; flex-direction:column; gap:8px">
+          {% for mode, label, desc in [
+            ('random',          '🎲 Aleatorio',           'Preguntas de todos los exámenes al azar'),
+            ('by_partial',      '📋 Por parcial',         'Enfocate en un examen específico'),
+            ('by_topic',        '🏷 Por tema',            'Practicá un tema de SO en particular'),
+            ('exam_simulation', '⏱ Simulacro de parcial','Reproduce la condición real del examen'),
+          ] %}
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:border-color var(--t)">
+            <input type="radio" name="mode" value="{{ mode }}" {% if mode == 'random' %}checked{% endif %}
+                   style="margin-top:3px; accent-color:var(--primary)">
+            <div>
+              <p class="font-medium text-sm">{{ label }}</p>
+              <p class="text-xs text-muted">{{ desc }}</p>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Examen (opcional)</label>
+          <select name="exam_id" class="form-control">
+            <option value="">Todos</option>
+            {% for exam in exams %}
+            <option value="{{ exam.id }}">Parcial {{ exam.partial_number }}{% if exam.exam_date %} · {{ exam.exam_date }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tema (opcional)</label>
+          <select name="topic" class="form-control">
+            <option value="">Todos</option>
+            {% for t in ['processes','memory','files','scheduling','deadlock','synchronization','io','security','other'] %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cantidad de preguntas: <strong id="qty-label">10</strong></label>
+        <input type="range" name="total_questions" id="qty-range" min="5" max="50" value="10"
+               style="width:100%; accent-color:var(--primary)"
+               oninput="document.getElementById('qty-label').textContent = this.value">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg w-full">▶ Comenzar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

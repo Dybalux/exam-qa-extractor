@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Practicando — ExamOCR{% endblock %}
+{% block page_title %}Práctica{% endblock %}
+{% block page_subtitle %}
+  <p class="page-subtitle">
+    Sesión #{{ session.id }} ·
+    {{ session.questions_answered }}/{{ session.total_questions }} respondidas ·
+    <span style="color:var(--success-light)">{{ session.correct_count }} ✓</span>
+    <span style="color:var(--danger-light)"> {{ session.incorrect_count }} ✗</span>
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <span id="quiz-timer" style="font-family:'JetBrains Mono',monospace; font-size:1.1rem; color:var(--text-secondary)">00:00</span>
+  <a href="/practice/{{ session.id }}/results" class="btn btn-ghost btn-sm">Terminar sesión</a>
+{% endblock %}
+
+{% block content %}
+<div class="quiz-card">
+  {# Progress #}
+  <div class="quiz-progress mb-6" style="margin-bottom:20px">
+    <div class="quiz-progress-label">
+      <span>Pregunta {{ session.questions_answered + 1 }} de {{ session.total_questions }}</span>
+      <span>{{ '%.0f'|format(session.accuracy) }}% precisión</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill {% if session.accuracy >= 70 %}success{% elif session.accuracy >= 40 %}warning{% endif %}"
+           data-value="{{ (session.questions_answered / session.total_questions * 100)|int }}" style="width:0%"></div>
+    </div>
+  </div>
+
+  {# Question card #}
+  <div class="card">
+    <div class="card-header">
+      <div class="flex gap-2 items-center">
+        <span class="badge topic-{{ question.topic }}">{{ question.topic }}</span>
+        <span class="text-xs font-mono" style="color:var(--warning-light)">{{ '★' * question.difficulty }}{{ '☆' * (5 - question.difficulty) }}</span>
+      </div>
+      {% if question.order_in_exam %}
+      <span class="text-xs text-muted">Preg. {{ question.order_in_exam }}</span>
+      {% endif %}
+    </div>
+
+    <div class="card-body">
+      <p style="font-size:1rem; line-height:1.7; margin-bottom:20px">
+        {{ question.question_text }}
+      </p>
+
+      <form method="POST" action="/practice/{{ session.id }}/answer" id="answer-form">
+        <input type="hidden" name="question_id" value="{{ question.id }}">
+        <input type="hidden" name="time_spent_seconds" id="time_spent_seconds" value="0">
+
+        <div class="answer-options">
+          {% for answer in answers %}
+          <label class="answer-option">
+            <input type="radio" name="selected_answer_id" value="{{ answer.id }}" required>
+            <span class="answer-text">{{ answer.answer_text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="flex gap-3 mt-4" style="margin-top:16px">
+          <button type="submit" class="btn btn-primary btn-lg" style="flex:1">Responder →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Skip #}
+  <div class="text-center mt-4" style="margin-top:12px">
+    <form method="POST" action="/practice/{{ session.id }}/skip" style="display:inline">
+      <input type="hidden" name="question_id" value="{{ question.id }}">
+      <input type="hidden" name="time_spent_seconds" id="skip_time" value="0">
+      <button type="submit" class="btn btn-ghost btn-sm"
+              onclick="document.getElementById('skip_time').value = document.getElementById('time_spent_seconds').value">
+        Saltar esta pregunta →
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+Alembic is a database migration tool for SQLAlchemy.
+
+## Creating Migrations
+
+Create a new migration:
+```bash
+alembic revision --autogenerate -m "description"
+```
+
+Apply migrations:
+```bash
+alembic upgrade head
+```
+
+Rollback one migration:
+```bash
+alembic downgrade -1
+```
+
+View current version:
+```bash
+alembic current
+```
+
+View history:
+```bash
+alembic history
+```

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Corregir OCR — ExamOCR{% endblock %}
+{% block page_title %}Corregir texto OCR{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Pregunta #{{ question.id }} · Examen #{{ question.exam_id }}</p>{% endblock %}
+{% block page_actions %}
+  <a href="/questions/{{ question.id }}" class="btn btn-ghost">← Cancelar</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+  {# OCR original (reference) #}
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Texto OCR original</h3>
+      {% if question.confidence_score is not none %}
+      <span class="badge {% if question.confidence_score >= 80 %}badge-success{% elif question.confidence_score >= 60 %}badge-warning{% else %}badge-danger{% endif %}">
+        {{ '%.0f'|format(question.confidence_score) }}% confianza
+      </span>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <pre class="font-mono text-sm" style="white-space:pre-wrap; color:var(--text-secondary); line-height:1.7">{{ question.extracted_text or question.question_text }}</pre>
+    </div>
+  </div>
+
+  {# Correction form #}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Texto corregido</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/questions/{{ question.id }}/correct">
+        <div class="form-group">
+          <label class="form-label">Texto corregido *</label>
+          <textarea name="corrected_text" class="form-control" rows="8" required
+                    placeholder="Escribí el texto correcto de la pregunta…">{{ question.question_text }}</textarea>
+          <p class="form-hint">Este texto reemplazará al texto actual y marcará la pregunta como corregida.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notas de corrección</label>
+          <input type="text" name="notes" class="form-control"
+                 placeholder="Ej: Se agregó tilde, se corrigió 'procesoo' → 'proceso'"
+                 value="{{ question.correction_notes or '' }}">
+          <p class="form-hint">Opcional. Útil para documentar qué cambió.</p>
+        </div>
+
+        <div class="flex gap-3">
+          <button type="submit" class="btn btn-success">✓ Guardar corrección</button>
+          <a href="/questions/{{ question.id }}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

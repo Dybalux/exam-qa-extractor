@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if exam else 'Nuevo' }} Examen — ExamOCR{% endblock %}
+{% block page_title %}{{ 'Editar examen' if exam else 'Nuevo examen' }}{% endblock %}
+{% block page_actions %}
+  <a href="{{ '/exams/' + exam.id|string if exam else '/exams' }}" class="btn btn-ghost">← Cancelar</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:520px">
+  <div class="card-body">
+    <form method="POST" action="{{ '/exams/' + exam.id|string + '/edit' if exam else '/exams/new' }}">
+      <div class="form-group">
+        <label class="form-label">Número de parcial *</label>
+        <select name="partial_number" class="form-control" required>
+          {% for p in [1,2,3,4] %}
+          <option value="{{ p }}" {% if exam and exam.partial_number == p %}selected{% endif %}>Parcial {{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Fecha del examen</label>
+        <input type="date" name="exam_date" class="form-control"
+               value="{{ exam.exam_date.isoformat() if exam and exam.exam_date else '' }}">
+        <p class="form-hint">Opcional, ayuda a organizar por fecha.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tags de temas</label>
+        <input type="text" name="topic_tags" class="form-control"
+               placeholder="procesos, memoria, sincronización"
+               value="{{ exam.topic_tags if exam and exam.topic_tags else '' }}">
+        <p class="form-hint">Separados por coma. Ayuda a filtrar y buscar.</p>
+      </div>
+
+      <div class="flex gap-3 mt-4">
+        <button type="submit" class="btn btn-primary">
+          {{ '💾 Guardar cambios' if exam else '+ Crear examen' }}
+        </button>
+        <a href="{{ '/exams/' + exam.id|string if exam else '/exams' }}" class="btn btn-ghost">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

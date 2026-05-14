@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — ExamOCR{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Resumen del sistema de estudio</p>{% endblock %}
+{% block page_actions %}
+  <a href="/practice" class="btn btn-primary">▶ Iniciar práctica</a>
+{% endblock %}
+
+{% block content %}
+{# Stats #}
+<div class="stats-grid mb-6">
+  <div class="stat-card primary">
+    <p class="stat-label">Exámenes</p>
+    <p class="stat-value">{{ stats.total_exams }}</p>
+    <p class="stat-sub">cargados</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Preguntas</p>
+    <p class="stat-value">{{ stats.total_questions }}</p>
+    <p class="stat-sub">totales</p>
+  </div>
+  <div class="stat-card success">
+    <p class="stat-label">Listas para practicar</p>
+    <p class="stat-value">{{ stats.questions_ready_for_practice }}</p>
+    <p class="stat-sub">{{ stats.practice_readiness_pct }}% del total</p>
+  </div>
+  <div class="stat-card warning">
+    <p class="stat-label">Sin respuestas</p>
+    <p class="stat-value">{{ stats.total_questions - stats.questions_ready_for_practice }}</p>
+    <p class="stat-sub">necesitan respuestas</p>
+  </div>
+</div>
+
+<div class="grid-2 mb-6">
+  {# Progress by partial #}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Avance por parcial</h3></div>
+    <div class="card-body">
+      {% for partial, data in progress.by_partial.items() %}
+      <div class="mb-4">
+        <div class="flex justify-between text-sm mb-4" style="margin-bottom:6px">
+          <span>Parcial {{ partial }}</span>
+          <span class="text-muted">{{ data.ready }}/{{ data.total }} ({{ data.readiness_pct }}%)</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill {% if data.readiness_pct >= 80 %}success{% elif data.readiness_pct >= 40 %}{% else %}{% endif %}"
+               data-value="{{ data.readiness_pct }}" style="width:0%"></div>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-muted text-sm">Sin datos aún.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Recent sessions #}
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Últimas sesiones</h3>
+      <a href="/analytics" class="btn btn-ghost btn-sm">Ver todo</a>
+    </div>
+    <div class="card-body">
+      {% if history %}
+      {% for s in history %}
+      <div class="flex justify-between items-center mb-4" style="padding:8px 0; border-bottom:1px solid var(--border-soft)">
+        <div>
+          <span class="badge badge-neutral">{{ s.mode }}</span>
+          <span class="text-sm text-secondary" style="margin-left:8px">{{ s.questions_answered }}/{{ s.total_questions }}</span>
+        </div>
+        <span class="text-sm {% if s.accuracy_pct >= 70 %}text-success{% elif s.accuracy_pct >= 40 %}text-warning{% else %}text-danger{% endif %}" style="color:{% if s.accuracy_pct >= 70 %}var(--success-light){% elif s.accuracy_pct >= 40 %}var(--warning-light){% else %}var(--danger-light){% endif %}">
+          {{ s.accuracy_pct }}%
+        </span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="text-muted text-sm">Todavía no practicaste. <a href="/practice">¡Empezá!</a></p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# Exams list #}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Exámenes</h3>
+    <a href="/exams/new" class="btn btn-outline btn-sm">+ Nuevo</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parcial</th><th>Fecha</th><th>Tags</th><th>Preguntas</th><th></th></tr></thead>
+      <tbody>
+      {% for exam in exams %}
+      <tr>
+        <td><span class="badge badge-primary">Parcial {{ exam.partial_number }}</span></td>
+        <td class="text-secondary">{{ exam.exam_date or '—' }}</td>
+        <td class="text-muted text-xs">{{ exam.topic_tags or '—' }}</td>
+        <td><a href="/exams/{{ exam.id }}">Ver detalle →</a></td>
+        <td class="table-actions">
+          <a href="/exams/{{ exam.id }}" class="btn btn-ghost btn-sm">Ver</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted">Sin exámenes. <a href="/exams/new">Crear uno</a>.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

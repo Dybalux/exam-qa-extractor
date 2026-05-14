@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Resultados — ExamOCR{% endblock %}
+{% block page_title %}Resultados de la sesión{% endblock %}
+{% block page_actions %}
+  <a href="/practice" class="btn btn-primary">▶ Nueva práctica</a>
+  <a href="/" class="btn btn-ghost">Ir al dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="quiz-card">
+  {# Score card #}
+  {% set acc = results.accuracy %}
+  <div class="card mb-6" style="text-align:center; padding:32px; background:{% if acc >= 70 %}#0d2818{% elif acc >= 40 %}#211500{% else %}#200c0c{% endif %}; border-color:{% if acc >= 70 %}var(--success){% elif acc >= 40 %}#9e6a03{% else %}var(--danger){% endif %}">
+    <p style="font-size:4rem; font-weight:800; line-height:1; color:{% if acc >= 70 %}var(--success-light){% elif acc >= 40 %}var(--warning-light){% else %}var(--danger-light){% endif %}">
+      {{ '%.0f'|format(acc) }}%
+    </p>
+    <p style="font-size:1.2rem; margin-top:8px; color:var(--text-secondary)">
+      {% if acc >= 80 %}¡Excelente! 🎉{% elif acc >= 60 %}Bien hecho 👍{% elif acc >= 40 %}Vas bien, seguí practicando 💪{% else %}Revisá las áreas débiles 📚{% endif %}
+    </p>
+  </div>
+
+  {# Stats #}
+  <div class="stats-grid mb-6">
+    <div class="stat-card success">
+      <p class="stat-label">Correctas</p>
+      <p class="stat-value">{{ results.correct_count }}</p>
+    </div>
+    <div class="stat-card danger">
+      <p class="stat-label">Incorrectas</p>
+      <p class="stat-value">{{ results.incorrect_count }}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">Saltadas</p>
+      <p class="stat-value">{{ results.skipped_count }}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">Tiempo total</p>
+      <p class="stat-value">
+        {% if results.total_time_seconds %}
+          {{ '%d:%02d'|format(results.total_time_seconds // 60, results.total_time_seconds % 60) }}
+        {% else %}—{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="flex gap-3 justify-between">
+    <a href="/analytics/weak-areas" class="btn btn-outline">🔍 Ver áreas débiles</a>
+    <a href="/practice" class="btn btn-primary">▶ Practicar de nuevo</a>
+  </div>
+</div>
+{% endblock %}

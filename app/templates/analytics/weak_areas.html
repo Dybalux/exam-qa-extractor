@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Áreas débiles — ExamOCR{% endblock %}
+{% block page_title %}Áreas débiles{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Temas donde tu precisión está por debajo del {{ threshold }}%</p>{% endblock %}
+{% block page_actions %}
+  <a href="/practice" class="btn btn-primary">▶ Practicar ahora</a>
+{% endblock %}
+
+{% block content %}
+{% if weak_areas %}
+<div class="card mb-6">
+  <div class="card-header">
+    <h3 class="card-title">{{ weak_areas|length }} área(s) débil(es)</h3>
+    <span class="text-xs text-muted">Umbral: {{ threshold }}% precisión</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tema</th><th>Precisión</th><th>Correctas / Total</th><th></th></tr></thead>
+      <tbody>
+      {% for area in weak_areas %}
+      <tr>
+        <td><span class="badge topic-{{ area.topic }}">{{ area.topic }}</span></td>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px">
+            <div class="progress-bar" style="width:100px; flex-shrink:0">
+              <div class="progress-fill"
+                   data-value="{{ area.accuracy_pct }}"
+                   style="width:0%; background:{% if area.accuracy_pct >= 50 %}var(--warning-light){% else %}var(--danger-light){% endif %}"></div>
+            </div>
+            <span style="color:{% if area.accuracy_pct >= 50 %}var(--warning-light){% else %}var(--danger-light){% endif %}; font-weight:600">
+              {{ area.accuracy_pct }}%
+            </span>
+          </div>
+        </td>
+        <td class="text-secondary text-sm">{{ area.correct }} / {{ area.total }}</td>
+        <td>
+          <a href="/practice?topic={{ area.topic }}" class="btn btn-outline btn-sm">▶ Practicar</a>
+          <a href="/search/by-topic/{{ area.topic }}" class="btn btn-ghost btn-sm">Ver preguntas</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>¡Ningún área débil! 🎉</h3>
+  <p>Tu precisión supera el {{ threshold }}% en todos los temas practicados.</p>
+  <a href="/practice" class="btn btn-primary mt-4">Seguir practicando</a>
+</div>
+{% endif %}
+
+{# Session history #}
+{% if history %}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Últimas {{ history|length }} sesiones</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Modo</th><th>Progreso</th><th>Precisión</th><th>Tiempo</th></tr></thead>
+      <tbody>
+      {% for s in history %}
+      <tr>
+        <td><span class="badge badge-neutral">{{ s.mode }}</span></td>
+        <td class="text-sm">{{ s.questions_answered }}/{{ s.total_questions }}</td>
+        <td style="color:{% if s.accuracy_pct >= 70 %}var(--success-light){% elif s.accuracy_pct >= 40 %}var(--warning-light){% else %}var(--danger-light){% endif %}; font-weight:600">
+          {{ s.accuracy_pct }}%
+        </td>
+        <td class="text-muted text-sm font-mono">
+          {% if s.total_time_seconds %}{{ '%d:%02d'|format(s.total_time_seconds // 60, s.total_time_seconds % 60) }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

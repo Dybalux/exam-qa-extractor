@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Revisar OCR — ExamOCR{% endblock %}
+{% block page_title %}Cola de revisión OCR{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">{{ questions|length }} pregunta(s) con baja confianza o sin corregir</p>{% endblock %}
+
+{% block content %}
+{# Exam filter #}
+<div class="flex gap-2 mb-6">
+  <a href="/search/needs-review" class="btn btn-sm {% if not selected_exam %}btn-primary{% else %}btn-ghost{% endif %}">Todos</a>
+  {% for exam in exams %}
+  <a href="/search/needs-review?exam_id={{ exam.id }}"
+     class="btn btn-sm {% if selected_exam == exam.id %}btn-primary{% else %}btn-ghost{% endif %}">
+    Parcial {{ exam.partial_number }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if questions %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Pregunta</th><th>Confianza</th><th>Topic</th><th>Examen</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for q in questions %}
+      <tr>
+        <td style="max-width:320px">
+          <p class="truncate text-sm">{{ q.question_text[:80] }}{% if q.question_text|length > 80 %}…{% endif %}</p>
+        </td>
+        <td>
+          {% if q.confidence_score is not none %}
+          <span class="badge {% if q.confidence_score >= 80 %}badge-success{% elif q.confidence_score >= 60 %}badge-warning{% else %}badge-danger{% endif %}">
+            {{ '%.0f'|format(q.confidence_score) }}%
+          </span>
+          {% else %}
+          <span class="badge badge-neutral">—</span>
+          {% endif %}
+        </td>
+        <td><span class="badge topic-{{ q.topic }}">{{ q.topic }}</span></td>
+        <td><a href="/exams/{{ q.exam_id }}" class="text-sm">Examen #{{ q.exam_id }}</a></td>
+        <td class="table-actions">
+          <a href="/questions/{{ q.id }}/correct" class="btn btn-primary btn-sm">✏ Corregir</a>
+          <a href="/questions/{{ q.id }}" class="btn btn-ghost btn-sm">Ver</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>¡Todo revisado! 🎉</h3>
+  <p>No hay preguntas pendientes de revisión OCR.</p>
+  <a href="/questions" class="btn btn-ghost mt-4">← Ver todas las preguntas</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Exam Study System{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="app-layout">
+
+  {# ── Sidebar ─────────────────────────────────────────── #}
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>📚 ExamOCR</h1>
+      <p>Sistemas Operativos</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <p class="nav-label">General</p>
+        <a href="/" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          Dashboard
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <p class="nav-label">Contenido</p>
+        <a href="/exams" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Exámenes
+        </a>
+        <a href="/questions" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Preguntas
+        </a>
+        <a href="/search/needs-review" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          Revisar OCR
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <p class="nav-label">Práctica</p>
+        <a href="/practice" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Iniciar práctica
+        </a>
+        <a href="/analytics/weak-areas" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Áreas débiles
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <p class="nav-label">Análisis</p>
+        <a href="/analytics" class="nav-item">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Estadísticas
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  {# ── Main ────────────────────────────────────────────── #}
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">{% block page_title %}Dashboard{% endblock %}</h2>
+        {% block page_subtitle %}<p class="page-subtitle"></p>{% endblock %}
+      </div>
+      <div class="flex gap-3">
+        {% block page_actions %}{% endblock %}
+      </div>
+    </div>
+
+    <div class="page-body">
+      {# Flash messages #}
+      {% if flash %}
+        <div class="alert alert-{{ flash.type }}" data-autohide>{{ flash.message }}</div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal" role="dialog" aria-labelledby="delete-modal-title" aria-modal="true" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="delete-modal-title">¿Eliminar?</h3>
+      <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="delete-modal-message"></p>
+      <div id="delete-modal-warning" class="modal-warning" hidden>
+        <div class="warning-icon">&#9888;</div>
+        <div class="warning-text">
+          <strong>Advertencia:</strong> <span id="warning-message"></span>
+        </div>
+      </div>
+      <label id="delete-modal-checkbox-wrapper" class="modal-checkbox" hidden>
+        <input type="checkbox" id="delete-modal-checkbox">
+        <span>Entiendo que esto eliminará también las preguntas asociadas</span>
+      </label>
+      <div id="delete-modal-error" class="modal-error" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" data-modal-close>Cancelar</button>
+      <button type="button" class="btn btn-danger" id="delete-modal-confirm" disabled>
+        <span class="btn-text">Eliminar</span>
+        <span class="btn-spinner" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4m0 12v4M2 12h4m12 0h4m-2.5-6.5l-2.8 2.8M7.3 16.7l-2.8 2.8M4.2 4.2l2.8 2.8m10 10l2.8 2.8"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<script src="/static/js/app.js?v=3"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

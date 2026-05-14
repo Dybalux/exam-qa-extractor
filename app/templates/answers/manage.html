@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Gestionar respuestas — ExamOCR{% endblock %}
+{% block page_title %}Gestionar respuestas{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">{{ question.question_text[:60] }}…</p>{% endblock %}
+{% block page_actions %}
+  <a href="/questions/{{ question.id }}" class="btn btn-ghost">← Volver</a>
+  <a href="/questions/{{ question.id }}/answers/new" class="btn btn-primary">+ Nueva</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:600px">
+  <div class="card-header">
+    <h3 class="card-title">Respuestas — arrastrar para reordenar</h3>
+    <span class="badge badge-neutral">{{ answers|length }} respuesta(s)</span>
+  </div>
+  <div class="card-body">
+    {% if answers %}
+    <form method="POST" action="/api/v1/answers/question/{{ question.id }}/reorder"
+          id="reorder-form">
+      <input type="hidden" id="ordered-ids" name="ordered_ids" value="">
+      <ul id="answer-reorder-list" style="display:flex; flex-direction:column; gap:8px">
+        {% for answer in answers %}
+        <li draggable="true" data-id="{{ answer.id }}"
+            style="display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius); cursor:grab">
+          <span style="color:var(--text-muted); cursor:grab; user-select:none">⠿</span>
+          <div style="flex:1">
+            <p class="text-sm">{{ answer.answer_text[:80] }}{% if answer.answer_text|length > 80 %}…{% endif %}</p>
+            <div class="flex gap-2" style="margin-top:4px">
+              {% if answer.is_correct %}<span class="badge badge-success">✓ Correcta</span>{% endif %}
+              {% if answer.is_common_misconception %}<span class="badge badge-warning">⚠ Error común</span>{% endif %}
+              <span class="badge badge-neutral text-xs">{{ answer.answer_type }}</span>
+            </div>
+          </div>
+          <a href="/questions/{{ question.id }}/answers/{{ answer.id }}/edit" class="btn btn-ghost btn-sm">✏</a>
+        </li>
+        {% endfor %}
+      </ul>
+      <button type="submit" class="btn btn-primary mt-4" style="margin-top:16px">💾 Guardar orden</button>
+    </form>
+    {% else %}
+    <div class="empty-state" style="padding:30px 0">
+      <h3>Sin respuestas</h3>
+      <a href="/questions/{{ question.id }}/answers/new" class="btn btn-primary mt-4">+ Agregar primera respuesta</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

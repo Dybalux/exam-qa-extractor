@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Parcial {{ exam.partial_number }} — ExamOCR{% endblock %}
+{% block page_title %}Parcial {{ exam.partial_number }}{% endblock %}
+{% block page_subtitle %}
+  <p class="page-subtitle">
+    {{ exam.exam_date.strftime('%d/%m/%Y') if exam.exam_date else 'Sin fecha' }}
+    {% if exam.topic_tags %} · {{ exam.topic_tags }}{% endif %}
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a href="/exams/{{ exam.id }}/questions/new" class="btn btn-outline">+ Agregar pregunta</a>
+  <a href="/exams/{{ exam.id }}/upload" class="btn btn-ghost">↑ Subir imagen</a>
+  <a href="/exams/{{ exam.id }}/edit" class="btn btn-ghost">Editar</a>
+  <a href="/practice?exam_id={{ exam.id }}" class="btn btn-primary">▶ Practicar</a>
+{% endblock %}
+
+{% block content %}
+{# Coverage stats #}
+<div class="stats-grid mb-6">
+  <div class="stat-card">
+    <p class="stat-label">Total preguntas</p>
+    <p class="stat-value">{{ coverage.total_questions or 0 }}</p>
+  </div>
+  <div class="stat-card success">
+    <p class="stat-label">Listas para practicar</p>
+    <p class="stat-value">{{ coverage.ready_for_practice or 0 }}</p>
+    <p class="stat-sub">{{ coverage.readiness_pct or 0 }}%</p>
+  </div>
+  <div class="stat-card warning">
+    <p class="stat-label">Corregidas OCR</p>
+    <p class="stat-value">{{ coverage.corrected or 0 }}</p>
+    <p class="stat-sub">{{ coverage.correction_pct or 0 }}%</p>
+  </div>
+</div>
+
+{# Readiness bar #}
+<div class="card mb-6">
+  <div class="card-body">
+    <div class="flex justify-between text-sm mb-4" style="margin-bottom:6px">
+      <span>Cobertura del examen</span>
+      <span class="text-muted">{{ coverage.readiness_pct or 0 }}% listo</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill {% if (coverage.readiness_pct or 0) >= 80 %}success{% endif %}"
+           data-value="{{ coverage.readiness_pct or 0 }}" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+{# Questions table #}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Preguntas ({{ questions|length }})</h3>
+    <a href="/search/needs-review?exam_id={{ exam.id }}" class="btn btn-ghost btn-sm">🔍 Revisar OCR</a>
+  </div>
+  {% if questions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Pregunta</th><th>Topic</th><th>Dif.</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for q in questions %}
+      <tr>
+        <td class="text-muted">{{ q.order_in_exam or '—' }}</td>
+        <td style="max-width:320px">
+          <a href="/questions/{{ q.id }}" class="truncate" style="display:block">{{ q.question_text[:80] }}{% if q.question_text|length > 80 %}…{% endif %}</a>
+        </td>
+        <td><span class="badge topic-{{ q.topic }}">{{ q.topic }}</span></td>
+        <td>
+          <span class="text-xs font-mono" style="color:var(--warning-light)">
+            {{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}
+          </span>
+        </td>
+        <td>
+          {% if q.is_ready_for_practice %}
+            <span class="badge badge-success">✓ Lista</span>
+          {% else %}
+            <span class="badge badge-warning">Sin resp.</span>
+          {% endif %}
+          {% if not q.is_corrected and q.confidence_score is not none and q.confidence_score < 60 %}
+            <span class="badge badge-danger">OCR bajo</span>
+          {% endif %}
+        </td>
+        <td class="table-actions">
+          <a href="/questions/{{ q.id }}" class="btn btn-ghost btn-sm">Ver</a>
+          {% if not q.is_corrected %}
+          <a href="/questions/{{ q.id }}/correct" class="btn btn-outline btn-sm">Corregir</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>Sin preguntas</h3>
+    <p>Subí una imagen del examen para extraer preguntas con OCR.</p>
+    <a href="/exams/{{ exam.id }}/upload" class="btn btn-primary mt-4">↑ Subir imagen</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

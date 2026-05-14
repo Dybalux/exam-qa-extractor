@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Nueva' if not answer else 'Editar' }} respuesta — ExamOCR{% endblock %}
+{% block page_title %}{{ 'Nueva respuesta' if not answer else 'Editar respuesta' }}{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Pregunta #{{ question.id }}: {{ question.question_text[:60] }}…</p>{% endblock %}
+{% block page_actions %}
+  <a href="/questions/{{ question.id }}" class="btn btn-ghost">← Cancelar</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px">
+  <div class="card-body">
+    <form method="POST" action="{{ '/questions/' + question.id|string + '/answers/' + answer.id|string + '/edit' if answer else '/questions/' + question.id|string + '/answers/new' }}">
+      <div class="form-group">
+        <label class="form-label">Texto de la respuesta *</label>
+        <textarea name="answer_text" class="form-control" rows="4" required
+                  placeholder="Escribí la respuesta…">{{ answer.answer_text if answer else '' }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tipo *</label>
+        <select name="answer_type" class="form-control" required>
+          <option value="correct"   {% if answer and answer.answer_type == 'correct' %}selected{% endif %}>✓ Correcta</option>
+          <option value="incorrect" {% if not answer or answer.answer_type == 'incorrect' %}selected{% endif %}>✗ Incorrecta</option>
+          <option value="partial"   {% if answer and answer.answer_type == 'partial' %}selected{% endif %}>~ Parcialmente correcta</option>
+        </select>
+        <p class="form-hint">Solo puede haber una respuesta correcta por pregunta.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Explicación</label>
+        <textarea name="explanation" class="form-control" rows="3"
+                  placeholder="¿Por qué es correcta/incorrecta?">{{ answer.explanation if answer and answer.explanation else '' }}</textarea>
+        <p class="form-hint">Se muestra después de responder en modo práctica.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label flex gap-2 items-center">
+          <input type="checkbox" name="is_common_misconception"
+                 {% if answer and answer.is_common_misconception %}checked{% endif %}>
+          Error común (confunde a muchos estudiantes)
+        </label>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="submit" class="btn btn-primary">
+          {{ '💾 Guardar' if answer else '+ Crear respuesta' }}
+        </button>
+        <a href="/questions/{{ question.id }}" class="btn btn-ghost">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

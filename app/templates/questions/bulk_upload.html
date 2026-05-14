@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Subir imagen — ExamOCR{% endblock %}
+{% block page_title %}Subir imagen de examen{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Parcial {{ exam.partial_number }} · El OCR extraerá las preguntas automáticamente</p>{% endblock %}
+{% block page_actions %}
+  <a href="/exams/{{ exam.id }}" class="btn btn-ghost">← Volver al examen</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px">
+  <div class="card-body">
+    <form method="POST" action="/api/v1/exams/{{ exam.id }}/upload" enctype="multipart/form-data">
+      <div class="form-group">
+        <label class="form-label">Imagen del examen *</label>
+        <div id="drop-zone" style="border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px; text-align:center; cursor:pointer; transition:border-color var(--t); background:var(--bg-base); position:relative; overflow:hidden">
+          <p style="font-size:2rem; margin-bottom:8px">📷</p>
+          <p class="text-secondary">Arrastrá una imagen o hacé clic para seleccionar</p>
+          <p class="text-xs text-muted" style="margin-top:4px">JPEG, PNG, PDF — máx. 10 MB</p>
+          <input type="file" name="file" id="file-input" accept="image/*,.pdf" required
+                 style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%">
+        </div>
+        <p id="file-name" class="text-sm text-muted mt-4" style="margin-top:8px; display:none"></p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Idioma OCR</label>
+        <select name="language" class="form-control">
+          <option value="spa">Español</option>
+          <option value="eng">Inglés</option>
+          <option value="spa+eng">Español + Inglés</option>
+        </select>
+      </div>
+
+      <div class="alert alert-info">
+        ℹ Después del procesamiento OCR, revisá y corregí las preguntas extraídas desde
+        <a href="/search/needs-review?exam_id={{ exam.id }}">la cola de revisión</a>.
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full">↑ Procesar imagen con OCR</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const input = document.getElementById('file-input');
+const nameEl = document.getElementById('file-name');
+const zone = document.getElementById('drop-zone');
+input.addEventListener('change', () => {
+  if (input.files[0]) {
+    nameEl.textContent = '📎 ' + input.files[0].name;
+    nameEl.style.display = 'block';
+    zone.style.borderColor = 'var(--primary)';
+  }
+});
+</script>
+{% endblock %}

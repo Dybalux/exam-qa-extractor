@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas — ExamOCR{% endblock %}
+{% block page_title %}Estadísticas{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Vista general del contenido y tu progreso de estudio</p>{% endblock %}
+
+{% block content %}
+{# Overall stats #}
+<div class="stats-grid mb-6">
+  <div class="stat-card primary">
+    <p class="stat-label">Exámenes</p>
+    <p class="stat-value">{{ stats.total_exams }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Preguntas</p>
+    <p class="stat-value">{{ stats.total_questions }}</p>
+  </div>
+  <div class="stat-card success">
+    <p class="stat-label">Listas para practicar</p>
+    <p class="stat-value">{{ stats.questions_ready_for_practice }}</p>
+    <p class="stat-sub">{{ stats.practice_readiness_pct }}%</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Sesiones completadas</p>
+    <p class="stat-value">{{ stats.completed_practice_sessions }}</p>
+    <p class="stat-sub">de {{ stats.total_practice_sessions }} totales</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  {# Progress by topic #}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Cobertura por tema</h3></div>
+    <div class="card-body">
+      {% for topic, data in progress.by_topic.items() %}
+      <div style="margin-bottom:14px">
+        <div class="flex justify-between text-xs mb-4" style="margin-bottom:5px">
+          <span class="badge topic-{{ topic }}">{{ topic }}</span>
+          <span class="text-muted">{{ data.ready }}/{{ data.total }}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill {% if data.readiness_pct >= 80 %}success{% elif data.readiness_pct >= 40 %}warning{% endif %}"
+               data-value="{{ data.readiness_pct }}" style="width:0%"></div>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-muted text-sm">Sin datos.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Performance by topic (user) #}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Mi desempeño por tema</h3></div>
+    <div class="card-body">
+      {% if performance %}
+        {% for topic, data in performance.items() %}
+        <div style="margin-bottom:14px">
+          <div class="flex justify-between text-xs mb-4" style="margin-bottom:5px">
+            <span class="badge topic-{{ topic }}">{{ topic }}</span>
+            <span style="color:{% if data.accuracy_pct >= 70 %}var(--success-light){% elif data.accuracy_pct >= 40 %}var(--warning-light){% else %}var(--danger-light){% endif %}">
+              {{ data.accuracy_pct }}%
+            </span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill {% if data.accuracy_pct >= 70 %}success{% elif data.accuracy_pct >= 40 %}warning{% else %}{% endif %}"
+                 data-value="{{ data.accuracy_pct }}" style="width:0%; {% if data.accuracy_pct < 40 %}background:var(--danger-light){% endif %}"></div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state" style="padding:20px 0">
+          <h3>Sin historial todavía</h3>
+          <p><a href="/practice">Empezá a practicar</a> para ver tu desempeño.</p>
+        </div>
+      {% endif %}
+    </div>
+    {% if performance %}
+    <div class="card-footer">
+      <a href="/analytics/weak-areas">Ver áreas débiles →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

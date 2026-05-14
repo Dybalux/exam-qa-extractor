@@ -1,0 +1,110 @@
+[project]
+name = "exam-study-system"
+version = "0.1.0"
+description = "OCR-powered API to extract questions from exam images, manage answers, and run interactive practice sessions"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    
+    # Database
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "aiosqlite>=0.19.0",
+    
+    # Validation & settings
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    
+    # OCR and image processing
+    "pytesseract>=0.3.10",
+    "pillow>=10.1.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.26.0",
+    "pymupdf>=1.23.0",  # PDF handling
+    
+    # File handling
+    "python-multipart>=0.0.6",
+    "python-magic>=0.4.27",
+    
+    # Templates
+    "jinja2>=3.1.2",
+    
+    # Environment
+    "python-dotenv>=1.0.0",
+    
+    # Logging
+    "structlog>=23.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+include = "\\.pyi?$"
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # Pyflakes
+    "I",  # isort
+    "N",  # pep8-naming
+]
+ignore = ["E501"]  # Line too long (handled by black)
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "pytesseract"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "magic"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "cv2"
+ignore_missing_imports = true

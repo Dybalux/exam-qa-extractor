@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Pregunta #{{ question.id }} — ExamOCR{% endblock %}
+{% block page_title %}Pregunta #{{ question.id }}{% endblock %}
+{% block page_subtitle %}
+  <p class="page-subtitle">
+    <span class="badge topic-{{ question.topic }}">{{ question.topic }}</span>
+    &nbsp;Dificultad {{ question.difficulty }}/5
+    &nbsp;·&nbsp;<a href="/exams/{{ question.exam_id }}">Examen #{{ question.exam_id }}</a>
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a href="/questions/{{ question.id }}/correct" class="btn btn-outline btn-sm">✏ Corregir OCR</a>
+  <a href="/questions/{{ question.id }}/answers/new" class="btn btn-primary">+ Agregar respuesta</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+  {# Question card #}
+  <div>
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title">Texto de la pregunta</h3>
+        {% if question.is_corrected %}
+          <span class="badge badge-success">✓ Corregida</span>
+        {% else %}
+          <span class="badge badge-warning">Sin corregir</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <p style="line-height:1.7">{{ question.question_text }}</p>
+        {% if question.correction_notes %}
+        <div class="alert alert-info mt-4" style="margin-top:12px">
+          <strong>Notas:</strong> {{ question.correction_notes }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if question.extracted_text and question.extracted_text != question.question_text %}
+    <div class="card mb-4">
+      <div class="card-header"><h3 class="card-title">Texto OCR original</h3></div>
+      <div class="card-body">
+        <pre class="font-mono text-xs text-secondary" style="white-space:pre-wrap">{{ question.extracted_text }}</pre>
+        {% if question.confidence_score is not none %}
+        <p class="text-xs text-muted mt-4" style="margin-top:8px">
+          Confianza: {{ '%.1f'|format(question.confidence_score) }}%
+        </p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Answers card #}
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Respuestas ({{ answers|length }})</h3>
+        <div class="flex gap-2">
+          {% if answers %}<a href="/questions/{{ question.id }}/answers/manage" class="btn btn-ghost btn-sm">Ordenar</a>{% endif %}
+          <a href="/questions/{{ question.id }}/answers/new" class="btn btn-outline btn-sm">+</a>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if answers %}
+          {% for answer in answers %}
+          <div class="answer-option {% if answer.is_correct %}correct{% endif %}" style="cursor:default; margin-bottom:8px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px">
+            <div style="flex:1">
+              <p class="answer-text">{{ answer.answer_text }}</p>
+              {% if answer.is_correct %}<span class="badge badge-success" style="margin-top:4px">✓ Correcta</span>{% endif %}
+              {% if answer.is_common_misconception %}<span class="badge badge-warning" style="margin-top:4px">⚠ Error común</span>{% endif %}
+              {% if answer.explanation %}
+              <p class="text-xs text-muted" style="margin-top:4px">{{ answer.explanation }}</p>
+              {% endif %}
+            </div>
+            <div>
+              <a href="/questions/{{ question.id }}/answers/{{ answer.id }}/edit" class="btn btn-ghost btn-sm" style="padding:0 8px; height:32px" title="Editar respuesta">✏</a>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state" style="padding:30px 0">
+            <h3>Sin respuestas</h3>
+            <p>Agregá al menos una respuesta correcta para poder practicar.</p>
+            <a href="/questions/{{ question.id }}/answers/new" class="btn btn-primary mt-4">+ Agregar respuesta</a>
+          </div>
+        {% endif %}
+      </div>
+      {% if not question.is_ready_for_practice %}
+      <div class="card-footer">
+        ⚠ Esta pregunta no tiene respuesta correcta — no aparecerá en práctica.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
