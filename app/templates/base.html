@@ -10,8 +10,11 @@
 <body>
 <div class="app-layout">
 
+  {# ── Sidebar Overlay ─────────────────────────────────── #}
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
   {# ── Sidebar ─────────────────────────────────────────── #}
-  <aside class="sidebar">
+  <aside id="sidebar" class="sidebar">
     <div class="sidebar-brand">
       <h1>📚 ExamOCR</h1>
       <p>Sistemas Operativos</p>
@@ -67,9 +70,14 @@
   {# ── Main ────────────────────────────────────────────── #}
   <div class="main-content">
     <div class="page-header">
-      <div>
-        <h2 class="page-title">{% block page_title %}Dashboard{% endblock %}</h2>
-        {% block page_subtitle %}<p class="page-subtitle"></p>{% endblock %}
+      <div class="flex items-center gap-3">
+        <button id="mobile-menu-btn" class="btn btn-ghost hide-desktop" aria-label="Abrir menú" style="padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div>
+          <h2 class="page-title">{% block page_title %}Dashboard{% endblock %}</h2>
+          {% block page_subtitle %}<p class="page-subtitle"></p>{% endblock %}
+        </div>
       </div>
       <div class="flex gap-3">
         {% block page_actions %}{% endblock %}

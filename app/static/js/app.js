@@ -1,3 +1,26 @@
+// ── Mobile Sidebar Toggle ───────────────────────────────────
+const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+if (mobileMenuBtn && sidebar && sidebarOverlay) {
+  const toggleSidebar = () => {
+    sidebar.classList.toggle('open');
+    sidebarOverlay.classList.toggle('open');
+    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+  };
+
+  mobileMenuBtn.addEventListener('click', toggleSidebar);
+  sidebarOverlay.addEventListener('click', toggleSidebar);
+
+  // Close sidebar with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+      toggleSidebar();
+    }
+  });
+}
+
 // ── Flash messages ──────────────────────────────────────────
 document.querySelectorAll('.alert[data-autohide]').forEach(el => {
   setTimeout(() => el.remove(), 4000);
