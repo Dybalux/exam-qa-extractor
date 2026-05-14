@@ -10,6 +10,7 @@
 {% endblock %}
 {% block page_actions %}
   <a href="/questions/{{ question.id }}/correct" class="btn btn-outline btn-sm">✏ Corregir OCR</a>
+  <button type="button" class="btn btn-danger" data-delete-modal data-entity="question" data-id="{{ question.id }}" data-preview="{{ question.question_text[:50] }}">🗑 Eliminar</button>
   <a href="/questions/{{ question.id }}/answers/new" class="btn btn-primary">+ Agregar respuesta</a>
 {% endblock %}
 

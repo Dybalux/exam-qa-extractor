@@ -11,6 +11,7 @@
   <a href="/exams/{{ exam.id }}/questions/new" class="btn btn-outline">+ Agregar pregunta</a>
   <a href="/exams/{{ exam.id }}/upload" class="btn btn-ghost">↑ Subir imagen</a>
   <a href="/exams/{{ exam.id }}/edit" class="btn btn-ghost">Editar</a>
+  <button type="button" class="btn btn-danger" data-delete-modal data-entity="exam" data-id="{{ exam.id }}" data-name="Parcial {{ exam.partial_number }}" data-questions-count="{{ questions|length }}">🗑 Eliminar</button>
   <a href="/practice?exam_id={{ exam.id }}" class="btn btn-primary">▶ Practicar</a>
 {% endblock %}
 

@@ -312,11 +312,17 @@ if (reorderList) {
     setTimeout(() => {
       row.remove();
 
-      // Check if table is now empty
+      // Check if table is now empty - show empty state without reload
       const tbody = row.closest('tbody');
       if (tbody && tbody.querySelectorAll('tr').length === 0) {
-        // Reload to show empty state
-        window.location.reload();
+        const tableWrap = tbody.closest('.table-wrap');
+        if (tableWrap) {
+          // Replace table with empty state message
+          const emptyState = document.createElement('div');
+          emptyState.className = 'empty-state';
+          emptyState.innerHTML = '<h3>Sin elementos</h3><p>Todos los elementos han sido eliminados.</p>';
+          tableWrap.replaceWith(emptyState);
+        }
       }
     }, 300);
   }
@@ -406,23 +412,11 @@ if (reorderList) {
 
   // Event delegation for delete buttons
   document.addEventListener('click', (e) => {
-    console.log('Click detected on:', e.target);
     const triggerBtn = e.target.closest('[data-delete-modal]');
-    console.log('Trigger button found:', triggerBtn);
     if (triggerBtn) {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Opening modal for:', triggerBtn.dataset);
       openDeleteModal(triggerBtn);
     }
   });
 })();
-
-// Fallback: ensure DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, delete modal functionality ready');
-  });
-} else {
-  console.log('DOM already loaded, delete modal functionality ready');
-}
