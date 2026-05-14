@@ -10,7 +10,7 @@
 {# Filters #}
 <div class="card mb-6">
   <div class="card-body">
-    <form method="GET" action="/questions" class="flex gap-3 flex-wrap items-center">
+    <form method="GET" action="/questions" class="filter-form flex gap-3 flex-wrap items-center">
       <select name="exam_id" class="form-control" style="width:auto">
         <option value="">Todos los exámenes</option>
         {% for exam in exams %}
@@ -47,31 +47,40 @@
 
 {% if questions %}
 <div class="card">
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Pregunta</th><th>Examen</th><th>Topic</th><th>Dif.</th><th>Estado</th><th></th></tr>
-      </thead>
-      <tbody>
-      {% for q in questions %}
-      <tr>
-        <td style="max-width:300px">
-          <a href="/questions/{{ q.id }}" class="truncate" style="display:block">
-            {{ q.question_text[:70] }}{% if q.question_text|length > 70 %}…{% endif %}
+  <div class="data-list">
+    <div class="data-list-header grid-questions">
+      <div>Pregunta</div><div>Examen</div><div>Topic</div><div>Dif.</div><div>Estado</div><div>Acciones</div>
+    </div>
+    {% for q in questions %}
+    <div class="data-list-row grid-questions">
+      <div class="data-list-cell" data-label="Pregunta" style="align-items: flex-start; text-align: right;">
+        <div style="min-width: 0; flex: 1;">
+          <a href="/questions/{{ q.id }}" style="display:inline-block; text-align: left; max-width: 100%;">
+            {{ q.question_text }}
           </a>
           {% if q.confidence_score is not none %}
-          <span class="text-xs text-muted">OCR: {{ '%.0f'|format(q.confidence_score) }}%</span>
+          <div class="text-xs text-muted" style="margin-top: 4px; text-align: right;">OCR: {{ '%.0f'|format(q.confidence_score) }}%</div>
           {% endif %}
-        </td>
-        <td><a href="/exams/{{ q.exam_id }}"><span class="badge badge-primary">Parcial</span></a></td>
-        <td><span class="badge topic-{{ q.topic }}">{{ q.topic }}</span></td>
-        <td class="text-xs font-mono" style="color:var(--warning-light)">{{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}</td>
-        <td>
+        </div>
+      </div>
+      <div class="data-list-cell" data-label="Examen">
+        <a href="/exams/{{ q.exam_id }}"><span class="badge badge-primary">Parcial</span></a>
+      </div>
+      <div class="data-list-cell" data-label="Topic">
+        <span class="badge topic-{{ q.topic }}">{{ q.topic }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Dif.">
+        <span class="text-xs font-mono" style="color:var(--warning-light)">{{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Estado">
+        <div class="flex gap-2">
           {% if q.is_ready_for_practice %}<span class="badge badge-success">✓</span>
           {% else %}<span class="badge badge-warning">Sin resp.</span>{% endif %}
           {% if q.is_corrected %}<span class="badge badge-neutral">Corregida</span>{% endif %}
-        </td>
-        <td class="table-actions">
+        </div>
+      </div>
+      <div class="data-list-cell" data-label="Acciones">
+        <div class="flex gap-2 flex-wrap justify-end">
           <a href="/questions/{{ q.id }}" class="btn btn-ghost btn-sm">Ver</a>
           {% if not q.is_corrected %}<a href="/questions/{{ q.id }}/correct" class="btn btn-outline btn-sm">Corregir</a>{% endif %}
           <button type="button" class="btn btn-danger btn-sm"
@@ -85,11 +94,10 @@
             </svg>
             Eliminar
           </button>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
 </div>
 {% else %}

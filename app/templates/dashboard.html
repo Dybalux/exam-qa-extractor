@@ -86,25 +86,35 @@
     <h3 class="card-title">Exámenes</h3>
     <a href="/exams/new" class="btn btn-outline btn-sm">+ Nuevo</a>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Parcial</th><th>Fecha</th><th>Tags</th><th>Preguntas</th><th></th></tr></thead>
-      <tbody>
-      {% for exam in exams %}
-      <tr>
-        <td><span class="badge badge-primary">Parcial {{ exam.partial_number }}</span></td>
-        <td class="text-secondary">{{ exam.exam_date or '—' }}</td>
-        <td class="text-muted text-xs">{{ exam.topic_tags or '—' }}</td>
-        <td><a href="/exams/{{ exam.id }}">Ver detalle →</a></td>
-        <td class="table-actions">
+  <div class="data-list">
+    <div class="data-list-header grid-dashboard-exams">
+      <div>Parcial</div><div>Fecha</div><div>Tags</div><div>Preguntas</div><div>Acciones</div>
+    </div>
+    {% for exam in exams %}
+    <div class="data-list-row grid-dashboard-exams">
+      <div class="data-list-cell" data-label="Parcial">
+        <span class="badge badge-primary">Parcial {{ exam.partial_number }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Fecha">
+        <span class="text-secondary">{{ exam.exam_date or '—' }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Tags">
+        <span class="text-muted text-xs">{{ exam.topic_tags or '—' }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Preguntas">
+        <a href="/exams/{{ exam.id }}">Ver detalle →</a>
+      </div>
+      <div class="data-list-cell" data-label="Acciones">
+        <div class="flex gap-2 justify-end">
           <a href="/exams/{{ exam.id }}" class="btn btn-ghost btn-sm">Ver</a>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-muted">Sin exámenes. <a href="/exams/new">Crear uno</a>.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="text-muted">Sin exámenes. <a href="/exams/new">Crear uno</a>.</p>
+    </div>
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

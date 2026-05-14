@@ -19,28 +19,31 @@
 
 {% if exams %}
 <div class="card">
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Parcial</th><th>Fecha</th><th>Tags</th><th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for exam in exams %}
-      <tr>
-        <td><span class="badge badge-primary">Parcial {{ exam.partial_number }}</span></td>
-        <td class="text-secondary">{{ exam.exam_date.strftime('%d/%m/%Y') if exam.exam_date else '—' }}</td>
-        <td>
-          {% if exam.topic_tags %}
-            {% for tag in exam.topic_tags.split(',') %}
-              <span class="badge badge-neutral">{{ tag.strip() }}</span>
-            {% endfor %}
-          {% else %}
-            <span class="text-muted">—</span>
-          {% endif %}
-        </td>
-        <td class="table-actions">
+  <div class="data-list">
+    <div class="data-list-header grid-exams">
+      <div>Parcial</div><div>Fecha</div><div>Tags</div><div>Acciones</div>
+    </div>
+    {% for exam in exams %}
+    <div class="data-list-row grid-exams">
+      <div class="data-list-cell" data-label="Parcial">
+        <span class="badge badge-primary">Parcial {{ exam.partial_number }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Fecha">
+        <span class="text-secondary">{{ exam.exam_date.strftime('%d/%m/%Y') if exam.exam_date else '—' }}</span>
+      </div>
+      <div class="data-list-cell" data-label="Tags">
+        {% if exam.topic_tags %}
+          <div class="flex gap-2 flex-wrap">
+          {% for tag in exam.topic_tags.split(',') %}
+            <span class="badge badge-neutral">{{ tag.strip() }}</span>
+          {% endfor %}
+          </div>
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </div>
+      <div class="data-list-cell" data-label="Acciones">
+        <div class="flex gap-2 flex-wrap justify-end">
           <a href="/exams/{{ exam.id }}" class="btn btn-ghost btn-sm">Ver</a>
           <a href="/exams/{{ exam.id }}/edit" class="btn btn-ghost btn-sm">Editar</a>
           <a href="/exams/{{ exam.id }}/upload" class="btn btn-outline btn-sm">↑ Subir imagen</a>
@@ -56,11 +59,10 @@
             </svg>
             Eliminar
           </button>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
 </div>
 {% else %}
