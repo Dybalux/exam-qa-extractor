@@ -16,17 +16,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint('check_valid_difficulty', 'questions', type_='check')
-    op.drop_column('questions', 'difficulty')
+    with op.batch_alter_table('questions', schema=None) as batch_op:
+        batch_op.drop_constraint('check_valid_difficulty', type_='check')
+        batch_op.drop_column('difficulty')
 
 
 def downgrade() -> None:
-    op.add_column(
-        'questions',
-        sa.Column('difficulty', sa.Integer(), nullable=False, server_default='3'),
-    )
-    op.create_check_constraint(
-        'check_valid_difficulty',
-        'questions',
-        'difficulty BETWEEN 1 AND 5',
-    )
+    with op.batch_alter_table('questions', schema=None) as batch_op:
+        batch_op.add_column(
+            sa.Column('difficulty', sa.Integer(), nullable=False, server_default='3'),
+        )
+        batch_op.create_check_constraint(
+            'check_valid_difficulty',
+            'difficulty BETWEEN 1 AND 5',
+        )
