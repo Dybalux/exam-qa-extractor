@@ -39,7 +39,6 @@ async def create_question(
             question_text=payload.question_text,
             topic=payload.topic,
             order_in_exam=payload.order_in_exam,
-            difficulty=payload.difficulty,
             image_id=payload.image_id,
             extracted_text=payload.extracted_text,
             confidence_score=payload.confidence_score,
@@ -75,7 +74,6 @@ async def list_questions(
     topic: str | None = None,
     is_corrected: bool | None = None,
     is_ready_for_practice: bool | None = None,
-    difficulty: int | None = None,
     service: QuestionService = Depends(get_question_service),
 ) -> list[QuestionResponse]:
     """List questions with optional filters."""
@@ -84,7 +82,6 @@ async def list_questions(
         topic=topic,
         is_corrected=is_corrected,
         is_ready_for_practice=is_ready_for_practice,
-        difficulty=difficulty,
     )
     return [QuestionResponse.model_validate(q) for q in questions]
 

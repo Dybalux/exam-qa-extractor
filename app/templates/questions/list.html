@@ -48,9 +48,9 @@
 {% if questions %}
 <div class="card">
   <div class="data-list">
-    <div class="data-list-header grid-questions">
-      <div>Pregunta</div><div>Examen</div><div>Topic</div><div>Dif.</div><div>Estado</div><div>Acciones</div>
-    </div>
+      <div class="data-list-header grid-questions">
+        <div>Pregunta</div><div>Examen</div><div>Topic</div><div>Estado</div><div>Acciones</div>
+      </div>
     {% for q in questions %}
     <div class="data-list-row grid-questions">
       <div class="data-list-cell" data-label="Pregunta" style="align-items: flex-start; text-align: right;">
@@ -68,9 +68,6 @@
       </div>
       <div class="data-list-cell" data-label="Topic">
         <span class="badge topic-{{ q.topic }}">{{ q.topic }}</span>
-      </div>
-      <div class="data-list-cell" data-label="Dif.">
-        <span class="text-xs font-mono" style="color:var(--warning-light)">{{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}</span>
       </div>
       <div class="data-list-cell" data-label="Estado">
         <div class="flex gap-2">

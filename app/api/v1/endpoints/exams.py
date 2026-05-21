@@ -212,7 +212,6 @@ async def upload_exam_image(
                     question_text=extracted_q.text,
                     topic="other",  # Default topic, user should review
                     order_in_exam=extracted_q.order,
-                    difficulty=3,  # Default difficulty
                     image_id=None,  # TODO: Create ExamImage record if needed
                     extracted_text=extracted_q.text,
                     confidence_score=extracted_q.confidence,

@@ -58,7 +58,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>#</th><th>Pregunta</th><th>Topic</th><th>Dif.</th><th>Estado</th><th></th></tr>
+        <tr><th>#</th><th>Pregunta</th><th>Topic</th><th>Estado</th><th></th></tr>
       </thead>
       <tbody>
       {% for q in questions %}
@@ -68,11 +68,6 @@
           <a href="/questions/{{ q.id }}" class="truncate" style="display:block">{{ q.question_text[:80] }}{% if q.question_text|length > 80 %}…{% endif %}</a>
         </td>
         <td><span class="badge topic-{{ q.topic }}">{{ q.topic }}</span></td>
-        <td>
-          <span class="text-xs font-mono" style="color:var(--warning-light)">
-            {{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}
-          </span>
-        </td>
         <td>
           {% if q.is_ready_for_practice %}
             <span class="badge badge-success">✓ Lista</span>

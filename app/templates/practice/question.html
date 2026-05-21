@@ -33,7 +33,6 @@
     <div class="card-header">
       <div class="flex gap-2 items-center">
         <span class="badge topic-{{ question.topic }}">{{ question.topic }}</span>
-        <span class="text-xs font-mono" style="color:var(--warning-light)">{{ '★' * question.difficulty }}{{ '☆' * (5 - question.difficulty) }}</span>
       </div>
       {% if question.order_in_exam %}
       <span class="text-xs text-muted">Preg. {{ question.order_in_exam }}</span>

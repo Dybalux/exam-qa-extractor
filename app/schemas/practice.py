@@ -15,7 +15,7 @@ class SessionCreate(BaseModel):
     exam_id: int | None = None
     filters: dict | None = Field(
         None,
-        description="Optional filters: topic, difficulty_min, difficulty_max",
+        description="Optional filters: topic",
     )
     total_questions: int = Field(default=10, ge=1, le=100)
 

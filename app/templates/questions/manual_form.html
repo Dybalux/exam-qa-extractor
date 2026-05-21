@@ -35,18 +35,6 @@
         </div>
 
         <div class="form-row">
-          {# Difficulty #}
-          <div class="form-group">
-            <label class="form-label">Dificultad *</label>
-            <select name="difficulty" class="form-control" required>
-              <option value="1" {% if form_data and form_data.difficulty == '1' %}selected{% endif %}>1 ★</option>
-              <option value="2" {% if form_data and form_data.difficulty == '2' %}selected{% endif %}>2 ★★</option>
-              <option value="3" {% if form_data and form_data.difficulty == '3' %}selected{% endif %}>3 ★★★</option>
-              <option value="4" {% if form_data and form_data.difficulty == '4' %}selected{% endif %}>4 ★★★★</option>
-              <option value="5" {% if form_data and form_data.difficulty == '5' %}selected{% endif %}>5 ★★★★★</option>
-            </select>
-          </div>
-
           {# Order in exam #}
           <div class="form-group">
             <label class="form-label">Número en examen</label>
@@ -92,15 +80,12 @@
           <li style="margin-bottom:12px">
             <strong>Texto claro:</strong> Escribí la pregunta completa y sin ambigüedades.
           </li>
-          <li style="margin-bottom:12px">
-            <strong>Tema correcto:</strong> Elegí el tema que corresponde para que las estadísticas sean útiles.
-          </li>
-          <li style="margin-bottom:12px">
-            <strong>Dificultad:</strong> 1 = muy fácil, 5 = muy difícil. Sé consistente con el resto del examen.
-          </li>
-          <li style="margin-bottom:12px">
-            <strong>Después agregás:</strong> Podés agregar respuestas incorrectas (distractores) desde la página de la pregunta.
-          </li>
+            <li style="margin-bottom:12px">
+              <strong>Tema correcto:</strong> Elegí el tema que corresponde para que las estadísticas sean útiles.
+            </li>
+            <li style="margin-bottom:12px">
+              <strong>Después agregás:</strong> Podés agregar respuestas incorrectas (distractores) desde la página de la pregunta.
+            </li>
         </ul>
 
         <div style="margin-top:20px;padding:16px;background:var(--primary-dim);border-radius:var(--radius);border:1px solid var(--primary)">

@@ -14,7 +14,6 @@ class QuestionCreate(BaseModel):
     question_text: str = Field(..., min_length=1)
     topic: str = Field(default=TopicEnum.OTHER.value)
     order_in_exam: int | None = Field(None, ge=1, le=50)
-    difficulty: int = Field(default=3, ge=1, le=5)
     image_id: int | None = None
     extracted_text: str | None = None
     confidence_score: float | None = Field(None, ge=0.0, le=100.0)
@@ -25,7 +24,6 @@ class QuestionUpdate(BaseModel):
 
     question_text: str | None = Field(None, min_length=1)
     topic: str | None = None
-    difficulty: int | None = Field(None, ge=1, le=5)
     order_in_exam: int | None = Field(None, ge=1, le=50)
     correction_notes: str | None = None
     is_corrected: bool | None = None
@@ -47,7 +45,6 @@ class BulkQuestionItem(BaseModel):
     confidence_score: float | None = Field(None, ge=0.0, le=100.0)
     topic: str = TopicEnum.OTHER.value
     order_in_exam: int | None = None
-    difficulty: int = Field(default=3, ge=1, le=5)
 
 
 class BulkCreateRequest(BaseModel):
@@ -73,7 +70,6 @@ class QuestionResponse(BaseModel):
     order_in_exam: int | None
     is_corrected: bool
     correction_notes: str | None
-    difficulty: int
     has_code_in_answers: bool
     is_ready_for_practice: bool
     created_at: datetime

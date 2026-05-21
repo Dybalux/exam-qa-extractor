@@ -22,10 +22,6 @@ class Question(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "difficulty BETWEEN 1 AND 5",
-            name="check_valid_difficulty",
-        ),
-        CheckConstraint(
             "order_in_exam BETWEEN 1 AND 50",
             name="check_valid_order",
         ),
@@ -54,7 +50,6 @@ class Question(Base):
     order_in_exam: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_corrected: Mapped[bool] = mapped_column(default=False, nullable=False)
     correction_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    difficulty: Mapped[int] = mapped_column(default=3, nullable=False)
     has_code_in_answers: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Relationships
