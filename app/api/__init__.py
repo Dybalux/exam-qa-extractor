@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import analytics, answers, exams, practice, questions, search
+from app.api.v1.endpoints import analytics, answers, exams, practice, questions, search
 
 api_router = APIRouter()
 

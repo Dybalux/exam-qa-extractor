@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
-from app.api.pages import router as pages_router
+from app.api.v1.endpoints.pages import router as pages_router
 from app.config import get_settings
 from app.core.exceptions import (
     ConflictError,
