@@ -67,6 +67,9 @@ htmlcov/
 # Don't ignore migrations, but ignore local dev files
 alembic.ini.local
 
+# SDD
+.atl/
+
 # Misc
 *.bak
 *.tmp

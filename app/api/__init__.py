@@ -2,15 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.api import (
-    analytics,
-    answers,
-    exams,
-    import_export,
-    practice,
-    questions,
-    search,
-)
+from app.api import import_export
+from app.api.v1.endpoints import analytics, answers, exams, practice, questions, search
 from app.api.v1.endpoints.subjects import router as subjects_router
 
 api_router = APIRouter()
