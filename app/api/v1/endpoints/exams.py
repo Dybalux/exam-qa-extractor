@@ -11,14 +11,16 @@ from app.core.exceptions import (
     StorageError,
 )
 from app.dependencies import (
+    get_answer_service,
     get_exam_service,
     get_ocr_service,
     get_question_service,
     get_storage_service,
 )
 from app.schemas.exam import ExamCreate, ExamResponse, ExamStats, ExamUpdate, TagsUpdate
+from app.services.answer_service import AnswerService
 from app.services.exam_service import ExamService
-from app.services.ocr_service import OCRService
+from app.services.ocr import BaseOCRProvider
 from app.services.question_service import QuestionService
 from app.services.storage_service import StorageService
 
@@ -126,8 +128,9 @@ async def upload_exam_image(
     language: str = "spa",
     exam_svc: ExamService = Depends(get_exam_service),
     storage_svc: StorageService = Depends(get_storage_service),
-    ocr_svc: OCRService = Depends(get_ocr_service),
+    ocr_svc: BaseOCRProvider = Depends(get_ocr_service),
     q_svc: QuestionService = Depends(get_question_service),
+    ans_svc: AnswerService = Depends(get_answer_service),
 ) -> RedirectResponse:
     """Upload and process exam image with OCR.
 
@@ -169,10 +172,11 @@ async def upload_exam_image(
         # Create questions from OCR results
         questions_created = 0
         questions_needing_review = 0
+        answers_created = 0
 
         for extracted_q in ocr_result.questions:
             try:
-                await q_svc.create_question(
+                question = await q_svc.create_question(
                     exam_id=exam_id,
                     question_text=extracted_q.text,
                     topic="other",  # Default topic, user should review
@@ -186,17 +190,41 @@ async def upload_exam_image(
                 if extracted_q.requires_review:
                     questions_needing_review += 1
 
+                # Create answers if any exist
+                for answer in extracted_q.answers:
+                    try:
+                        await ans_svc.create_answer(
+                            question_id=question.id,
+                            answer_text=answer.text,
+                            answer_type=answer.answer_type,
+                            explanation=answer.explanation,
+                            display_order=answer.display_order,
+                        )
+                        answers_created += 1
+                    except Exception as answer_err:
+                        logger.error(f"Failed to create answer: {answer_err}")
+                        await ans_svc.session.rollback()
+                        continue
+
             except Exception as e:
                 logger.error(f"Failed to create question from OCR: {e}")
+                await q_svc.session.rollback()
+                continue
+                logger.error(f"Failed to create question from OCR: {e}")
+                await q_svc.session.rollback()
                 continue
 
         # Build redirect message
         if questions_created > 0:
+            message_parts = [f"Se crearon {questions_created} preguntas"]
+            if answers_created > 0:
+                message_parts.append(f"y {answers_created} respuestas")
+            message = ". ".join(message_parts) + "."
+            
             if questions_needing_review > 0:
-                message = f"Se crearon {questions_created} preguntas. {questions_needing_review} necesitan revisión."
+                message += f" {questions_needing_review} necesitan revisión."
                 redirect_url = f"/search/needs-review?exam_id={exam_id}&message={message.replace(' ', '+')}"
             else:
-                message = f"Se crearon {questions_created} preguntas correctamente."
                 redirect_url = f"/exams/{exam_id}?message={message.replace(' ', '+')}"
         else:
             message = "No se pudieron extraer preguntas del archivo."
