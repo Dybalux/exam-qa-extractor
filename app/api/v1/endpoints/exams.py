@@ -197,10 +197,17 @@ async def upload_exam_image(
         try:
             ocr_result = await ocr_svc.extract_from_path(upload_result.storage_path)
         except OCRProcessingError as ocr_err:
-            # OCR failed but file was saved - redirect with warning
+            # OCR failed but file was saved - redirect with clear explanation
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")
+            err_msg = str(ocr_err)
+            
+            if ocr_svc.engine_name == "openai":
+                friendly_msg = f"El servicio de OpenAI Vision no pudo procesar la imagen. Detalle técnico: {err_msg}"
+            else:
+                friendly_msg = f"Error al procesar la imagen con OCR: {err_msg}"
+                
             return RedirectResponse(
-                url=f"/exams/{exam_id}?message=Archivo+guardado+pero+OCR+falló:+{str(ocr_err)}&type=warning",
+                url=f"/exams/{exam_id}/upload?message={friendly_msg.replace(' ', '+')}&type=error",
                 status_code=303
             )
         
