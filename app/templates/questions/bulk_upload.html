@@ -7,9 +7,28 @@
 {% endblock %}
 
 {% block content %}
+{% if flash and flash.type == 'error' and ('OpenAI' in flash.message or 'OCR' in flash.message or 'key' in flash.message or 'api' in flash.message or 'Vision' in flash.message) %}
+<div class="alert alert-danger" style="max-width:560px; margin-bottom:20px; background:#2c0f0f; border-color:var(--danger); color:var(--danger-light); padding:20px; border-radius:var(--radius-lg); border:1px solid">
+  <h4 style="margin:0 0 10px 0; font-weight:600; display:flex; align-items:center; gap:8px; font-size:1.1rem; color:#ffb3b3">
+    ⚠️ Error al procesar con OpenAI Vision
+  </h4>
+  <p style="margin:0 0 14px 0; font-size:0.9rem; line-height:1.5">
+    {{ flash.message }}
+  </p>
+  <hr style="border:0; border-top:1px solid rgba(255, 255, 255, 0.15); margin:14px 0">
+  <p style="margin:0 0 8px 0; font-size:0.875rem; font-weight:600; color:#ffb3b3">🛠️ Pasos recomendados para solucionarlo:</p>
+  <ul style="margin:0; padding-left:20px; font-size:0.875rem; line-height:1.6; display:flex; flex-direction:column; gap:6px">
+    <li><strong>Verificá la API Key:</strong> Asegurate de que <code>OPENAI_API_KEY</code> esté configurada correctamente en tu archivo <code>.env</code>.</li>
+    <li><strong>Revisá tu saldo/crédito:</strong> Ingresá a la consola de OpenAI y verificá si tenés fondos cargados (la API no utiliza el saldo de la suscripción ChatGPT Plus).</li>
+    <li><strong>Límites y cuota:</strong> Confirmá si tu cuenta no excedió su cuota mensual o el límite de solicitudes establecido por OpenAI.</li>
+    <li><strong>Alternativa local:</strong> Si preferís trabajar sin OpenAI, podés cambiar a <code>ocr_provider = tesseract</code> en el archivo <code>.env</code> para procesar las imágenes de manera 100% local y gratuita.</li>
+  </ul>
+</div>
+{% endif %}
+
 <div class="card" style="max-width:560px">
   <div class="card-body">
-    <form method="POST" action="/api/v1/exams/{{ exam.id }}/upload" enctype="multipart/form-data">
+    <form method="POST" action="/api/v1/exams/{{ exam.id }}/upload" enctype="multipart/form-data" id="upload-form">
       <div class="form-group">
         <label class="form-label">Imagen del examen *</label>
         <div id="drop-zone" style="border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px; text-align:center; cursor:pointer; transition:border-color var(--t); background:var(--bg-base); position:relative; overflow:hidden">
@@ -20,6 +39,7 @@
                  style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%">
         </div>
         <p id="file-name" class="text-sm text-muted mt-4" style="margin-top:8px; display:none"></p>
+        <p class="text-xs text-muted mt-2" style="margin-top:8px">ℹ️ Si subís un PDF de varias páginas, solo se procesará la <strong>primera página</strong>.</p>
       </div>
 
       <div class="form-group">
@@ -34,10 +54,26 @@
       <div class="alert alert-info">
         ℹ Después del procesamiento OCR, revisá y corregí las preguntas extraídas desde
         <a href="/search/needs-review?exam_id={{ exam.id }}">la cola de revisión</a>.
+        <br><strong>Nota:</strong> Si subís un PDF de varias páginas, solo se procesará la primera página.
       </div>
 
       <button type="submit" class="btn btn-primary w-full">↑ Procesar imagen con OCR</button>
     </form>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="upload-loading" class="loading-overlay" hidden>
+  <div class="loading-content">
+    <div class="loading-spinner"></div>
+    <h3>Procesando imagen con OpenAI Vision...</h3>
+    <p class="text-muted">Extrayendo preguntas y respuestas. Esto puede tardar 10-30 segundos.</p>
+    <div class="loading-progress">
+      <div class="progress-bar" style="width:100%">
+        <div class="progress-fill" id="loading-progress-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <p id="loading-status" class="text-sm text-secondary mt-2">Inicializando...</p>
   </div>
 </div>
 {% endblock %}
@@ -47,6 +83,11 @@
 const input = document.getElementById('file-input');
 const nameEl = document.getElementById('file-name');
 const zone = document.getElementById('drop-zone');
+const form = document.getElementById('upload-form');
+const loadingOverlay = document.getElementById('upload-loading');
+const progressBar = document.getElementById('loading-progress-bar');
+const loadingStatus = document.getElementById('loading-status');
+
 input.addEventListener('change', () => {
   if (input.files[0]) {
     nameEl.textContent = '📎 ' + input.files[0].name;
@@ -54,5 +95,126 @@ input.addEventListener('change', () => {
     zone.style.borderColor = 'var(--primary)';
   }
 });
+
+// Loading overlay with progress simulation
+form.addEventListener('submit', (e) => {
+  const file = input.files[0];
+  if (!file) return;
+  
+  // Show loading overlay IMMEDIATELY before form submits
+  e.preventDefault();
+  loadingOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  loadingStatus.textContent = 'Preparando envío...';
+  
+  // Small delay to ensure overlay renders before form submits
+  setTimeout(() => {
+    // Remove the preventDefault and submit the form
+    form.submit();
+  }, 300);
+  
+  // Simulate progress
+  let progress = 0;
+  const stages = [
+    'Subiendo imagen...',
+    'Redimensionando imagen...',
+    'Enviando a OpenAI Vision API...',
+    'Extrayendo preguntas...',
+    'Extrayendo respuestas...',
+    'Validando resultados...',
+    'Guardando en la base de datos...'
+  ];
+  
+  const progressInterval = setInterval(() => {
+    progress += Math.random() * 15;
+    if (progress > 90) progress = 90; // Stop at 90% until form completes
+    
+    progressBar.style.width = progress + '%';
+    
+    // Update status based on progress
+    const stageIndex = Math.floor((progress / 100) * stages.length);
+    loadingStatus.textContent = stages[Math.min(stageIndex, stages.length - 1)];
+  }, 500);
+  
+  // Store interval to clear when page unloads (form completed)
+  window.uploadProgressInterval = progressInterval;
+});
+
+// Clear loading state if page unloads
+window.addEventListener('beforeunload', () => {
+  if (window.uploadProgressInterval) {
+    clearInterval(window.uploadProgressInterval);
+  }
+});
 </script>
+
+<style>
+.loading-overlay[hidden] {
+  display: none !important;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.loading-content {
+  background: var(--card-bg, #1a1a2e);
+  padding: 40px 60px;
+  border-radius: var(--radius-lg, 12px);
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.loading-content h3 {
+  margin: 24px 0 8px;
+  color: var(--text-primary, #fff);
+  font-size: 1.25rem;
+}
+
+.loading-content .text-muted {
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 0.875rem;
+  margin-bottom: 24px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border, #333);
+  border-top-color: var(--primary, #4f46e5);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-progress {
+  margin-top: 20px;
+}
+
+.loading-progress .progress-bar {
+  height: 8px;
+  background: var(--border, #333);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.loading-progress .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary, #4f46e5), var(--primary-light, #6366f1));
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+</style>
 {% endblock %}
