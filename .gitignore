@@ -82,3 +82,6 @@ parse_engram.py
 save_verify_report.py
 engram-export.json
 database_backup_*.json
+
+openspec/
+exam_images/
