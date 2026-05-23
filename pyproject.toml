@@ -24,6 +24,7 @@ dependencies = [
     "opencv-python>=4.8.0",
     "numpy>=1.26.0",
     "pymupdf>=1.23.0",  # PDF handling
+    "openai>=1.0.0",
     
     # File handling
     "python-multipart>=0.0.6",

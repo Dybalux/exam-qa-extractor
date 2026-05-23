@@ -72,3 +72,5 @@ alembic.ini.local
 # Misc
 *.bak
 *.tmp
+openspec/
+exam_images/

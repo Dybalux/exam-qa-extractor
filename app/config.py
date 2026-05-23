@@ -23,8 +23,12 @@ class Settings(BaseSettings):
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
 
     # OCR
+    ocr_provider: str = "tesseract"
     tesseract_cmd: str = "tesseract"
     tesseract_lang: str = "spa"
+    openai_api_key: str | None = None
+    openai_vision_model: str = "gpt-4o-mini"
+    openai_max_image_size_mb: int = 4
 
     # App
     debug: bool = False
