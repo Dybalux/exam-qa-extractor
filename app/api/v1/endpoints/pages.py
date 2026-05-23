@@ -346,15 +346,10 @@ async def bulk_upload_page(
         exam = await service.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="questions/bulk_upload.html",
-        context=_ctx(
-            request,
-            page_title="Subir imágenes",
-            exam=exam,
-        ),
-    )
+    flash = _get_flash_from_query(request)
+    return templates.TemplateResponse(request=request, name="questions/bulk_upload.html", context=_ctx(
+        request, page_title="Subir imágenes", exam=exam, flash=flash,
+    ))
 
 
 @router.get("/exams/{exam_id}/questions/new", response_class=HTMLResponse)

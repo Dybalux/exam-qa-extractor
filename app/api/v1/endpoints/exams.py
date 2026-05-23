@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from app.core.exceptions import (
     FileValidationError,
     NotFoundError,
+    OCRProcessingError,
     StorageError,
 )
 from app.dependencies import (
@@ -159,14 +160,20 @@ async def upload_exam_image(
         )
 
         try:
-            # Process OCR
-            ocr_result = await ocr_svc.process_image(upload_result.absolute_path)
-        except Exception as ocr_err:
-            # OCR failed but file was saved - redirect with warning
+            ocr_result = await ocr_svc.extract_from_path(upload_result.storage_path)
+        except OCRProcessingError as ocr_err:
+            # OCR failed but file was saved - redirect with clear explanation
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")
+            err_msg = str(ocr_err)
+            
+            if ocr_svc.engine_name == "openai":
+                friendly_msg = f"El servicio de OpenAI Vision no pudo procesar la imagen. Detalle técnico: {err_msg}"
+            else:
+                friendly_msg = f"Error al procesar la imagen con OCR: {err_msg}"
+                
             return RedirectResponse(
-                url=f"/exams/{exam_id}?message=Archivo+guardado+pero+OCR+falló:+{str(ocr_err)}&type=warning",
-                status_code=303,
+                url=f"/exams/{exam_id}/upload?message={friendly_msg.replace(' ', '+')}&type=error",
+                status_code=303
             )
 
         # Create questions from OCR results
@@ -207,9 +214,6 @@ async def upload_exam_image(
                         continue
 
             except Exception as e:
-                logger.error(f"Failed to create question from OCR: {e}")
-                await q_svc.session.rollback()
-                continue
                 logger.error(f"Failed to create question from OCR: {e}")
                 await q_svc.session.rollback()
                 continue
