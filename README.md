@@ -47,8 +47,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. Install dependencies:
 ```bash
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 4. Copy environment file:
@@ -104,7 +103,7 @@ image_to_text/
 ├── alembic/            # Database migrations
 ├── tests/              # Test suite
 ├── uploads/            # File uploads (created at runtime)
-└── requirements.txt    # Dependencies
+└── pyproject.toml      # Project metadata and dependencies
 ```
 
 ## License
