@@ -24,6 +24,7 @@ dependencies = [
     "opencv-python>=4.8.0",
     "numpy>=1.26.0",
     "pymupdf>=1.23.0",  # PDF handling
+    "openai>=1.0.0",
     
     # File handling
     "python-multipart>=0.0.6",
@@ -41,12 +42,21 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Testing
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
     "httpx>=0.25.0",
+    "factory-boy>=3.3.0",
+    "freezegun>=1.2.0",
+    
+    # Code quality
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
+    
+    # Type stubs
+    "types-python-magic>=0.4.0",
 ]
 
 [build-system]
