@@ -70,6 +70,10 @@ alembic.ini.local
 # SDD
 .atl/
 
+# Docker
+docker-compose.observability.yml
+config/
+
 # Misc
 *.bak
 *.tmp
