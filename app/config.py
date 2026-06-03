@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     openai_vision_model: str = "gpt-4o-mini"
     openai_max_image_size_mb: int = 4
 
+    # Observability — Langfuse
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "http://localhost:3000"
+
     # App
     debug: bool = False
     secret_key: str = "change-this-secret-key-in-production"

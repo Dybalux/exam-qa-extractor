@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import fitz  # PyMuPDF for PDF support
-from openai import AsyncOpenAI, OpenAI, RateLimitError
+import langfuse as langfuse_mod
+from openai import OpenAI, RateLimitError
+from langfuse.openai import AsyncOpenAI
 from PIL import Image
 
 from app.config import get_settings
@@ -18,6 +20,26 @@ from app.services.ocr.base import BaseOCRProvider
 from app.services.ocr.types import ExtractedAnswer, ExtractedQuestion, OCRResult
 
 logger = logging.getLogger(__name__)
+
+# --- Langfuse initialization (once per process, at import time) ---
+_settings = get_settings()
+_langfuse_client = None
+if _settings.langfuse_public_key and _settings.langfuse_secret_key:
+    _langfuse_client = langfuse_mod.Langfuse(
+        public_key=_settings.langfuse_public_key,
+        secret_key=_settings.langfuse_secret_key,
+        host=_settings.langfuse_host,
+    )
+    logger.info(
+        "Langfuse tracing enabled — host=%s  model=%s",
+        _settings.langfuse_host,
+        _settings.openai_vision_model,
+    )
+else:
+    logger.info(
+        "Langfuse not configured (missing LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY) "
+        "— OpenAI calls will NOT be traced"
+    )
 
 OPENAI_JSON_SCHEMA = {
     "name": "ExamExtraction",

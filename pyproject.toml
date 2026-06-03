@@ -25,7 +25,7 @@ dependencies = [
     "numpy>=1.26.0,<3.0",
     "pymupdf>=1.23.0,<2.0",  # PDF handling
     "openai>=1.0.0,<2.0",
-
+    "langfuse>=4.0.0",
     # File handling
     "python-multipart>=0.0.6,<1.0",
     "python-magic>=0.4.27,<1.0",
