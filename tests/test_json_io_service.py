@@ -235,3 +235,321 @@ async def test_export_uses_dedicated_logger_name(
         "Expected at least one log record on logger "
         "'app.services.json_io_service'"
     )
+
+
+# ===========================================================================
+# Tests for preview_import (T2.3)
+# ===========================================================================
+
+import pytest
+
+from app.core.exceptions import MalformedImportError, UnknownSchemaVersion
+from app.schemas.json_io import (
+    AnswerExportSchema,
+    ExamContextExportSchema,
+    ExportFileSchema,
+    QuestionExportSchema,
+)
+from app.services.json_io_service import JsonIOService, PREVIEW_ENTRY_CAP
+
+
+def _envelope_dict(
+    questions: list[dict],
+    schema_version: str = "1.0",
+) -> dict:
+    """Build a raw JSON-loaded dict (what the HTTP layer hands the service)."""
+    return {
+        "schema_version": schema_version,
+        "exported_at": "2024-06-15T12:00:00+00:00",
+        "questions": questions,
+    }
+
+
+def _question_dict(
+    uuid: str,
+    exam_uuid: str,
+    text: str = "Q",
+    is_corrected: bool = False,
+    answers: list[dict] | None = None,
+    topic: str = "OTHER",
+) -> dict:
+    """Build a raw JSON question entry for tests."""
+    if answers is None:
+        answers = []
+    return {
+        "uuid": uuid,
+        "exam_context": {
+            "uuid": exam_uuid,
+            "partial_number": 1,
+            "exam_date": "2024-06-15",
+            "topic_tags": "algebra",
+        },
+        "question_text": text,
+        "extracted_text": None,
+        "topic": topic,
+        "order_in_exam": 1,
+        "is_corrected": is_corrected,
+        "correction_notes": None,
+        "has_code_in_answers": False,
+        "answers": answers,
+    }
+
+
+def _answer_dict(
+    uuid: str,
+    text: str = "A",
+    atype: str = "correct",
+    display_order: int = 0,
+) -> dict:
+    return {
+        "uuid": uuid,
+        "answer_text": text,
+        "answer_type": atype,
+        "is_common_misconception": False,
+        "explanation": None,
+        "display_order": display_order,
+    }
+
+
+@pytest.mark.asyncio
+async def test_preview_no_db_writes(db_session: AsyncSession) -> None:
+    """``preview_import`` must NOT add, update, or delete any rows."""
+    # Seed an exam and a question so the DB is not empty.
+    exam = Exam(partial_number=1, exam_date=__import__("datetime").date(2024, 6, 15), topic_tags="a")
+    db_session.add(exam)
+    await db_session.flush()
+    q = Question(exam_id=exam.id, question_text="Seed", is_corrected=False)
+    db_session.add(q)
+    await db_session.commit()
+
+    from sqlalchemy import func, select as _select
+
+    # Capture counts before the preview.
+    exam_count_before = (
+        await db_session.execute(_select(func.count()).select_from(Exam))
+    ).scalar_one()
+    question_count_before = (
+        await db_session.execute(_select(func.count()).select_from(Question))
+    ).scalar_one()
+    answer_count_before = (
+        await db_session.execute(_select(func.count()).select_from(Answer))
+    ).scalar_one()
+
+    # Preview an envelope that would create 1 new question and delete the seed.
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid="99999999-9999-4999-8999-999999999999",
+                exam_uuid=exam.uuid,
+                text="Brand new question",
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    preview = await svc.preview_import(payload)
+    assert preview.to_create == 1
+    assert preview.to_delete == 1
+
+    # DB row counts must be unchanged after a preview.
+    exam_count_after = (
+        await db_session.execute(_select(func.count()).select_from(Exam))
+    ).scalar_one()
+    question_count_after = (
+        await db_session.execute(_select(func.count()).select_from(Question))
+    ).scalar_one()
+    answer_count_after = (
+        await db_session.execute(_select(func.count()).select_from(Answer))
+    ).scalar_one()
+
+    assert exam_count_after == exam_count_before
+    assert question_count_after == question_count_before
+    assert answer_count_after == answer_count_before
+
+
+@pytest.mark.asyncio
+async def test_preview_mixed_changes(db_session: AsyncSession) -> None:
+    """Mixed envelope: 5 new / 3 update / 0 delete / 1 malformed report."""
+    from datetime import date as _date
+
+    # Seed 3 existing questions that will be the "update" half.
+    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15), topic_tags="algebra")
+    db_session.add(exam)
+    await db_session.flush()
+
+    update_uuids: list[str] = []
+    for i in range(3):
+        q = Question(
+            exam_id=exam.id,
+            question_text=f"Old Q{i}",
+            is_corrected=False,
+        )
+        db_session.add(q)
+        await db_session.flush()
+        update_uuids.append(q.uuid)
+    await db_session.commit()
+
+    # Build the JSON envelope: 5 new + 3 updated + 1 malformed.
+    questions: list[dict] = []
+    for i in range(5):
+        questions.append(
+            _question_dict(
+                uuid=f"0000000{i}-0000-4000-8000-000000000000",
+                exam_uuid=exam.uuid,
+                text=f"New Q{i}",
+            )
+        )
+    for idx, q_uuid in enumerate(update_uuids):
+        questions.append(
+            _question_dict(
+                uuid=q_uuid,
+                exam_uuid=exam.uuid,
+                text=f"Updated Q{idx}",
+                is_corrected=True,  # forces a content diff → to_update
+            )
+        )
+    # 1 malformed: topic is missing the required type. ``partial_number`` is
+    # coerced to a non-int (via the strict schema: out of range 1..4 → fails).
+    bad = _question_dict(
+        uuid="99999999-9999-4999-8999-999999999999",
+        exam_uuid=exam.uuid,
+    )
+    bad["exam_context"]["partial_number"] = 99  # out of ge=1, le=4
+    questions.append(bad)
+
+    payload = _envelope_dict(questions)
+    svc = JsonIOService(db_session)
+
+    # The malformed entry triggers a single ``MalformedImportError``
+    # whose details carry every failure (1 entry in this case).
+    with pytest.raises(MalformedImportError) as exc_info:
+        await svc.preview_import(payload)
+    err = exc_info.value
+    assert err.details is not None
+    validation_errors = err.details["validation_errors"]
+    assert len(validation_errors) == 1
+    assert validation_errors[0]["index"] == len(questions) - 1
+
+    # Now drop the malformed entry and re-run: 5 create / 3 update / 0 delete.
+    good_payload = _envelope_dict(questions[:-1])
+    preview = await svc.preview_import(good_payload)
+    assert preview.to_create == 5
+    assert preview.to_update == 3
+    assert preview.to_delete == 0
+    assert preview.validation_errors == []
+    # 5 creates + 3 updates = 8 preview entries (under the cap of 50).
+    assert len(preview.preview) == 8
+    actions = [e["action"] for e in preview.preview]
+    assert actions.count("create") == 5
+    assert actions.count("update") == 3
+
+
+@pytest.mark.asyncio
+async def test_preview_unknown_schema_version_raises(
+    db_session: AsyncSession,
+) -> None:
+    """An unsupported ``schema_version`` raises :class:`UnknownSchemaVersion`."""
+    payload = _envelope_dict([], schema_version="0.9")
+    svc = JsonIOService(db_session)
+    with pytest.raises(UnknownSchemaVersion) as exc_info:
+        await svc.preview_import(payload)
+    assert "0.9" in exc_info.value.message
+    assert "1.0" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_preview_collects_all_validation_errors(
+    db_session: AsyncSession,
+) -> None:
+    """3 malformed entries → a single error with 3 entries (NOT fail-fast)."""
+    exam = Exam(partial_number=1, exam_date=__import__("datetime").date(2024, 6, 15))
+    db_session.add(exam)
+    await db_session.commit()
+    exam_uuid = exam.uuid
+
+    bad1 = _question_dict(uuid="11111111-1111-4111-8111-111111111111", exam_uuid=exam_uuid)
+    bad1["exam_context"]["partial_number"] = "not an int"  # strict → fail
+    bad2 = _question_dict(uuid="22222222-2222-4222-8222-222222222222", exam_uuid=exam_uuid)
+    bad2["answers"] = [{"uuid": "x", "answer_text": "", "answer_type": "correct",
+                         "is_common_misconception": False, "explanation": None,
+                         "display_order": 0}]  # min_length=1 → fail
+    bad3 = _question_dict(uuid="33333333-3333-4333-8333-333333333333", exam_uuid=exam_uuid)
+    bad3["question_text"] = ""  # min_length=1 → fail
+
+    payload = _envelope_dict([bad1, bad2, bad3])
+    svc = JsonIOService(db_session)
+    with pytest.raises(MalformedImportError) as exc_info:
+        await svc.preview_import(payload)
+
+    validation_errors = exc_info.value.details["validation_errors"]
+    assert len(validation_errors) == 3, (
+        "All 3 malformed entries must be reported in one error."
+    )
+    indices = {e["index"] for e in validation_errors}
+    assert indices == {0, 1, 2}
+    # Each entry's uuid is preserved when the input was a dict.
+    uuids = {e["uuid"] for e in validation_errors}
+    assert "11111111-1111-4111-8111-111111111111" in uuids
+    assert "22222222-2222-4222-8222-222222222222" in uuids
+    assert "33333333-3333-4333-8333-333333333333" in uuids
+
+
+@pytest.mark.asyncio
+async def test_preview_identical_content_reports_zero_changes(
+    db_session: AsyncSession,
+) -> None:
+    """A question that matches the DB byte-for-byte does NOT increment any counter."""
+    from datetime import date as _date
+
+    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15), topic_tags="algebra")
+    db_session.add(exam)
+    await db_session.flush()
+    q = Question(
+        exam_id=exam.id,
+        question_text="Stable Q",
+        topic="OTHER",
+        order_in_exam=1,
+        is_corrected=False,
+        correction_notes=None,
+        has_code_in_answers=False,
+    )
+    db_session.add(q)
+    await db_session.commit()
+
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid=q.uuid,
+                exam_uuid=exam.uuid,
+                text="Stable Q",
+                topic="OTHER",
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    preview = await svc.preview_import(payload)
+    assert preview.to_create == 0
+    assert preview.to_update == 0
+    assert preview.to_delete == 0
+    assert preview.preview == []
+
+
+@pytest.mark.asyncio
+async def test_preview_caps_preview_list_at_50_entries(
+    db_session: AsyncSession,
+) -> None:
+    """``preview.preview`` is capped at 50 entries by the service."""
+    from datetime import date as _date
+
+    # Seed 60 questions so the delete set exceeds 50.
+    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15))
+    db_session.add(exam)
+    await db_session.flush()
+    for i in range(60):
+        db_session.add(Question(exam_id=exam.id, question_text=f"Q{i}"))
+    await db_session.commit()
+
+    payload = _envelope_dict([])  # empty JSON → all 60 are orphans
+    svc = JsonIOService(db_session)
+    preview = await svc.preview_import(payload)
+    assert preview.to_delete == 60
+    assert len(preview.preview) == PREVIEW_ENTRY_CAP
