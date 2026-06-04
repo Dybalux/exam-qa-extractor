@@ -40,6 +40,7 @@ class AnswerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    uuid: str
     question_id: int
     answer_text: str
     answer_type: str

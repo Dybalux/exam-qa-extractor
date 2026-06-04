@@ -64,6 +64,7 @@ class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    uuid: str
     exam_id: int
     image_id: int | None
     question_text: str
@@ -73,7 +74,6 @@ class QuestionResponse(BaseModel):
     order_in_exam: int | None
     is_corrected: bool
     correction_notes: str | None
-    difficulty: int
     has_code_in_answers: bool
     is_ready_for_practice: bool
     created_at: datetime
