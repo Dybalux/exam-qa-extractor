@@ -70,6 +70,9 @@ def _canonical_question() -> dict:
         "is_corrected": False,
         "correction_notes": None,
         "has_code_in_answers": False,
+        "difficulty": 3,
+        "image_id": None,
+        "confidence_score": None,
         "answers": [_canonical_answer()],
     }
 
@@ -150,6 +153,47 @@ def test_question_export_schema_defaults_answers_to_empty_list() -> None:
     payload.pop("answers")
     q = QuestionExportSchema.model_validate(payload)
     assert q.answers == []
+
+
+# ---------------------------------------------------------------------------
+# Difficulty / image_id / confidence_score (round-trip preservation)
+# ---------------------------------------------------------------------------
+
+
+def test_question_export_schema_requires_difficulty() -> None:
+    """``difficulty`` is part of the round-trip contract; missing → reject."""
+    payload = _canonical_envelope()
+    payload["questions"][0].pop("difficulty")
+    with pytest.raises(ValidationError) as exc_info:
+        ExportFileSchema.model_validate(payload)
+    assert "difficulty" in str(exc_info.value)
+
+
+def test_question_export_schema_rejects_difficulty_out_of_range() -> None:
+    """``difficulty`` is ``ge=1, le=5``; 0 and 6 must be rejected."""
+    for bad_value in (0, 6):
+        payload = _canonical_envelope()
+        payload["questions"][0]["difficulty"] = bad_value
+        with pytest.raises(ValidationError):
+            ExportFileSchema.model_validate(payload)
+
+
+def test_question_export_schema_accepts_null_image_id_and_confidence_score() -> None:
+    """``image_id`` and ``confidence_score`` are nullable; ``None`` is valid."""
+    # The canonical fixture already sets them to ``None``; this is the
+    # explicit round-trip check that the field is read back as ``None``.
+    envelope = ExportFileSchema.model_validate(_canonical_envelope())
+    q = envelope.questions[0]
+    assert q.image_id is None
+    assert q.confidence_score is None
+
+
+def test_question_export_schema_strict_rejects_string_confidence_score() -> None:
+    """Strict mode rejects a string for the float field ``confidence_score``."""
+    payload = _canonical_envelope()
+    payload["questions"][0]["confidence_score"] = "0.87"
+    with pytest.raises(ValidationError):
+        ExportFileSchema.model_validate(payload)
 
 
 # ---------------------------------------------------------------------------

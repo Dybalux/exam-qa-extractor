@@ -169,6 +169,11 @@ class JsonIOService:
         The exam context is denormalized inline; the answers are
         nested. ``Question.exam`` is guaranteed to be loaded by the
         ``selectinload`` in :meth:`export_full_db`.
+
+        ``difficulty``, ``image_id`` and ``confidence_score`` are
+        included so the round-trip preserves them. See
+        :class:`~app.schemas.json_io.QuestionExportSchema` for why
+        ``image_id`` is NOT severed on import.
         """
         return QuestionExportSchema(
             uuid=question.uuid,
@@ -180,6 +185,9 @@ class JsonIOService:
             is_corrected=question.is_corrected,
             correction_notes=question.correction_notes,
             has_code_in_answers=question.has_code_in_answers,
+            difficulty=question.difficulty,
+            image_id=question.image_id,
+            confidence_score=question.confidence_score,
             answers=[
                 self._serialize_answer(a) for a in sorted(question.answers, key=lambda a: a.display_order)
             ],
@@ -323,12 +331,16 @@ class JsonIOService:
     ) -> bool:
         """Return True iff the JSON question matches the DB row at the field level.
 
-        Only fields present in the export shape are compared; fields
-        the schema does not carry (``difficulty``, ``image_id``,
-        ``confidence_score``, ``created_at``, ``updated_at``) are
-        not in scope for the diff. A question whose DB row matches
-        the JSON on every export field is reported as
-        ``to_update=0`` (no change).
+        Only fields present in the export shape are compared; the
+        DB-only fields (``created_at``, ``updated_at``) are not in
+        scope. A question whose DB row matches the JSON on every
+        export field is reported as ``to_update=0`` (no change).
+
+        ``difficulty``, ``image_id`` and ``confidence_score`` ARE
+        in scope (they are part of the export shape). Without
+        including them, the diff would silently miss edits to
+        these fields, and the apply path would emit a no-op when
+        a real change was pending.
         """
         # Scalar question fields
         if db_q.question_text != json_q.question_text:
@@ -344,6 +356,12 @@ class JsonIOService:
         if db_q.correction_notes != json_q.correction_notes:
             return False
         if db_q.has_code_in_answers != json_q.has_code_in_answers:
+            return False
+        if db_q.difficulty != json_q.difficulty:
+            return False
+        if db_q.image_id != json_q.image_id:
+            return False
+        if db_q.confidence_score != json_q.confidence_score:
             return False
 
         # Denormalized exam context
@@ -650,6 +668,9 @@ class JsonIOService:
                         existing.has_code_in_answers = (
                             json_q.has_code_in_answers
                         )
+                        existing.difficulty = json_q.difficulty
+                        existing.image_id = json_q.image_id
+                        existing.confidence_score = json_q.confidence_score
                         updated += 1
                 else:
                     new_q = Question(
@@ -662,6 +683,9 @@ class JsonIOService:
                         is_corrected=json_q.is_corrected,
                         correction_notes=json_q.correction_notes,
                         has_code_in_answers=json_q.has_code_in_answers,
+                        difficulty=json_q.difficulty,
+                        image_id=json_q.image_id,
+                        confidence_score=json_q.confidence_score,
                     )
                     self.session.add(new_q)
                     question_map[json_q.uuid] = new_q

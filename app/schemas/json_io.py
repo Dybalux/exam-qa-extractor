@@ -86,6 +86,25 @@ class QuestionExportSchema(BaseModel):
     The parent exam is denormalized into ``exam_context``; the answers
     are nested inline. This keeps the envelope a single flat array
     of questions and matches the spec's locked shape.
+
+    Round-trip contract
+    -------------------
+
+    The schema carries every user-editable field of the ``Question``
+    row that is meaningful to restore on import, including
+    ``difficulty``, ``image_id`` and ``confidence_score``. The
+    previous version of this schema omitted these three fields; the
+    apply path silently fell back to model defaults, which is a
+    data-loss bug for any question whose difficulty, image link or
+    OCR confidence had been edited in the source DB. They are now
+    part of the round-trip contract.
+
+    ``image_id`` is intentionally NOT re-mapped to ``None`` on
+    import. The destination DB either has the same ``exam_images``
+    row (round-trip into the same DB works) or it does not, in
+    which case the ``IntegrityError`` triggers the apply path's
+    transaction rollback and the user gets a clear failure rather
+    than a silently severed image link.
     """
 
     model_config = ConfigDict(strict=True)
@@ -99,6 +118,9 @@ class QuestionExportSchema(BaseModel):
     is_corrected: bool
     correction_notes: str | None
     has_code_in_answers: bool
+    difficulty: int = Field(..., ge=1, le=5)
+    image_id: int | None
+    confidence_score: float | None
     answers: list[AnswerExportSchema] = Field(default_factory=list)
 
 
