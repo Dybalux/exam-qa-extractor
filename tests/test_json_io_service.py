@@ -1199,3 +1199,273 @@ async def test_apply_overwrites_difficulty_on_existing_question(
     # Re-export and confirm the new difficulty stuck.
     envelope = await svc.export_full_db()
     assert envelope.questions[0].difficulty == 5
+
+
+# ---------------------------------------------------------------------------
+# (j) Per-field diff sensitivity (closes the verify-report WARNING on the
+#     early-return branches of ``_question_matches_db``).
+#
+#     The helper compares every question/answer field one-by-one; if any
+#     field differs, it returns ``False`` early. The WARNING was that
+#     only ``difficulty`` had a focused "change just this field" test.
+#     This parameterized case walks the remaining 16 fields and pins
+#     the contract: a change in ANY of them must register as
+#     ``to_update=1``.
+# ---------------------------------------------------------------------------
+
+
+from datetime import date as _date_mod
+
+
+# Canonical baseline values used by every parameter case. Keeping them
+# here (not in the fixture) makes it obvious that every case is a delta
+# of exactly one field from this baseline.
+_BASELINE_QUESTION = {
+    "question_text": "Q",
+    "extracted_text": "raw OCR",
+    "topic": "OTHER",
+    "order_in_exam": 1,
+    "is_corrected": False,
+    "correction_notes": None,
+    "has_code_in_answers": False,
+    "difficulty": 3,
+    "image_id": None,
+    "confidence_score": None,
+    "exam_partial_number": 1,
+    "exam_date": _date_mod(2024, 6, 15),
+    "exam_topic_tags": "algebra",
+    "answer_text": "A",
+    "answer_type": "correct",
+    "answer_is_common_misconception": False,
+    "answer_explanation": None,
+    "answer_display_order": 0,
+}
+
+
+def _build_diff_payload(
+    uuid: str,
+    exam_uuid: str,
+    delta_field: str,
+    answer_uuid: str,
+) -> dict:
+    """Build a JSON envelope with the given field changed from the baseline.
+
+    All other fields match the DB baseline (see ``_seed_baseline_question``
+    below). The only delta is on the named field, so any ``to_update > 0``
+    is attributable to that one comparison branch in
+    ``_question_matches_db`` (or ``_answer_matches_db`` for answer fields).
+    """
+    q = {
+        "question_text": _BASELINE_QUESTION["question_text"],
+        "extracted_text": _BASELINE_QUESTION["extracted_text"],
+        "topic": _BASELINE_QUESTION["topic"],
+        "order_in_exam": _BASELINE_QUESTION["order_in_exam"],
+        "is_corrected": _BASELINE_QUESTION["is_corrected"],
+        "correction_notes": _BASELINE_QUESTION["correction_notes"],
+        "has_code_in_answers": _BASELINE_QUESTION["has_code_in_answers"],
+        "difficulty": _BASELINE_QUESTION["difficulty"],
+        "image_id": _BASELINE_QUESTION["image_id"],
+        "confidence_score": _BASELINE_QUESTION["confidence_score"],
+        "exam_context": {
+            "uuid": exam_uuid,
+            "partial_number": _BASELINE_QUESTION["exam_partial_number"],
+            "exam_date": _BASELINE_QUESTION["exam_date"].isoformat(),
+            "topic_tags": _BASELINE_QUESTION["exam_topic_tags"],
+        },
+        "answers": [
+            {
+                "uuid": answer_uuid,
+                "answer_text": _BASELINE_QUESTION["answer_text"],
+                "answer_type": _BASELINE_QUESTION["answer_type"],
+                "is_common_misconception": _BASELINE_QUESTION[
+                    "answer_is_common_misconception"
+                ],
+                "explanation": _BASELINE_QUESTION["answer_explanation"],
+                "display_order": _BASELINE_QUESTION["answer_display_order"],
+            }
+        ],
+    }
+
+    # Apply the single-field delta. Each branch sets one entry; the rest
+    # of the payload is the baseline.
+    if delta_field == "question_text":
+        q["question_text"] = "Q changed"
+    elif delta_field == "extracted_text":
+        q["extracted_text"] = "raw OCR changed"
+    elif delta_field == "topic":
+        q["topic"] = "MEMORY"
+    elif delta_field == "order_in_exam":
+        q["order_in_exam"] = 2
+    elif delta_field == "is_corrected":
+        q["is_corrected"] = True
+    elif delta_field == "correction_notes":
+        q["correction_notes"] = "needs review"
+    elif delta_field == "has_code_in_answers":
+        q["has_code_in_answers"] = True
+    elif delta_field == "image_id":
+        q["image_id"] = 999  # value mismatch; FK is not exercised here
+    elif delta_field == "confidence_score":
+        q["confidence_score"] = 0.5
+    elif delta_field == "exam_partial_number":
+        q["exam_context"]["partial_number"] = 2
+    elif delta_field == "exam_date":
+        q["exam_context"]["exam_date"] = "2024-09-20"
+    elif delta_field == "exam_topic_tags":
+        q["exam_context"]["topic_tags"] = "geometry"
+    elif delta_field == "answer_text":
+        q["answers"][0]["answer_text"] = "A changed"
+    elif delta_field == "answer_type":
+        q["answers"][0]["answer_type"] = "incorrect"
+    elif delta_field == "answer_is_common_misconception":
+        q["answers"][0]["is_common_misconception"] = True
+    elif delta_field == "answer_explanation":
+        q["answers"][0]["explanation"] = "because reasons"
+    elif delta_field == "answer_display_order":
+        q["answers"][0]["display_order"] = 7
+    else:
+        raise AssertionError(f"Unknown delta field: {delta_field}")
+
+    return {
+        "uuid": uuid,
+        **q,
+    }
+
+
+async def _seed_baseline_question(
+    session: AsyncSession,
+) -> tuple[Exam, Question, Answer]:
+    """Seed the DB with one question + one answer matching ``_BASELINE_QUESTION``."""
+    exam = Exam(
+        partial_number=_BASELINE_QUESTION["exam_partial_number"],
+        exam_date=_BASELINE_QUESTION["exam_date"],
+        topic_tags=_BASELINE_QUESTION["exam_topic_tags"],
+    )
+    session.add(exam)
+    await session.flush()
+    q = Question(
+        exam_id=exam.id,
+        question_text=_BASELINE_QUESTION["question_text"],
+        extracted_text=_BASELINE_QUESTION["extracted_text"],
+        topic=_BASELINE_QUESTION["topic"],
+        order_in_exam=_BASELINE_QUESTION["order_in_exam"],
+        is_corrected=_BASELINE_QUESTION["is_corrected"],
+        correction_notes=_BASELINE_QUESTION["correction_notes"],
+        has_code_in_answers=_BASELINE_QUESTION["has_code_in_answers"],
+        difficulty=_BASELINE_QUESTION["difficulty"],
+        image_id=_BASELINE_QUESTION["image_id"],
+        confidence_score=_BASELINE_QUESTION["confidence_score"],
+    )
+    session.add(q)
+    await session.flush()
+    a = Answer(
+        question_id=q.id,
+        answer_text=_BASELINE_QUESTION["answer_text"],
+        answer_type=_BASELINE_QUESTION["answer_type"],
+        is_common_misconception=_BASELINE_QUESTION[
+            "answer_is_common_misconception"
+        ],
+        explanation=_BASELINE_QUESTION["answer_explanation"],
+        display_order=_BASELINE_QUESTION["answer_display_order"],
+    )
+    session.add(a)
+    await session.commit()
+    return exam, q, a
+
+
+# The 16 fields ``_question_matches_db`` compares, minus ``difficulty``
+# (already covered by ``test_preview_detects_difficulty_change``).
+_DIFF_SENSITIVITY_FIELDS = [
+    "question_text",
+    "extracted_text",
+    "topic",
+    "order_in_exam",
+    "is_corrected",
+    "correction_notes",
+    "has_code_in_answers",
+    "image_id",
+    "confidence_score",
+    "exam_partial_number",
+    "exam_date",
+    "exam_topic_tags",
+    "answer_text",
+    "answer_type",
+    "answer_is_common_misconception",
+    "answer_explanation",
+    "answer_display_order",
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("delta_field", _DIFF_SENSITIVITY_FIELDS)
+async def test_preview_detects_change_in_each_field(
+    db_session: AsyncSession, delta_field: str
+) -> None:
+    """A delta in ANY of the 17 fields the diff compares must register as ``to_update=1``.
+
+    Pinned by the verify report as the missing branch coverage on
+    ``_question_matches_db``'s early-return comparisons. Each parameter
+    case is a JSON envelope that matches the DB on every field EXCEPT
+    one; the diff MUST catch the change.
+    """
+    exam, q, a = await _seed_baseline_question(db_session)
+
+    payload = _envelope_dict(
+        [
+            _build_diff_payload(
+                uuid=q.uuid,
+                exam_uuid=exam.uuid,
+                delta_field=delta_field,
+                answer_uuid=a.uuid,
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    preview = await svc.preview_import(payload)
+    assert preview.to_create == 0, (
+        f"field {delta_field!r}: expected 0 creates, got {preview.to_create}"
+    )
+    assert preview.to_update == 1, (
+        f"field {delta_field!r}: expected 1 update, got {preview.to_update} "
+        "(the diff helper did not detect this change)"
+    )
+    assert preview.to_delete == 0
+
+
+# ---------------------------------------------------------------------------
+# (k) image_id FK failure → IntegrityError → rollback
+#     (closes the verify-report SUGGESTION on a missing image_id round-trip test)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_rolls_back_on_missing_image_id_fk(
+    db_session: AsyncSession,
+) -> None:
+    """An import that references a non-existent ``exam_images.id`` rolls back.
+
+    The apply path round-trips ``image_id`` as-is (deliberately NOT
+    severing to None). The safety net is the DB's FK constraint: if
+    the destination DB lacks the referenced image row, the
+    ``IntegrityError`` must roll back the entire transaction, leaving
+    the DB in its pre-import state.
+    """
+    # DB is empty. Build a payload that references image_id=999 (no
+    # ``exam_images`` row with that id exists).
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid="00000001-0000-4000-8000-000000000001",
+                exam_uuid="00000001-0000-4000-8000-000000000000",
+                text="Q1",
+                image_id=999,  # FK target does not exist
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    with pytest.raises(IntegrityError):
+        await svc.apply_import(payload)
+
+    # No rows should be persisted: the FK violation rolled back the
+    # entire transaction (including the new exam and question).
+    counts = await _row_counts(db_session)
+    assert counts == {"exams": 0, "questions": 0, "answers": 0}

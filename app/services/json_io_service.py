@@ -592,15 +592,11 @@ class JsonIOService:
             updated = 0
             deleted = 0
 
-            # Step 3: DELETE orphans (children first). Track
-            # ``deleted_answer_uuids`` so step 8 doesn't try to
-            # re-update an answer that was just deleted here.
-            deleted_answer_uuids: set[str] = set()
+            # Step 3: DELETE orphans (children first).
             for ans_uuid in list(db_answer_by_uuid.keys()):
                 if ans_uuid not in json_answer_uuids:
                     await self.session.delete(db_answer_by_uuid[ans_uuid])
                     deleted += 1
-                    deleted_answer_uuids.add(ans_uuid)
             for q_uuid in list(db_question_by_uuid.keys()):
                 if q_uuid not in json_question_uuids:
                     await self.session.delete(db_question_by_uuid[q_uuid])
@@ -700,12 +696,7 @@ class JsonIOService:
             for json_q in parsed_questions:
                 parent_q = question_map[json_q.uuid]
                 for json_a in json_q.answers:
-                    if json_a.uuid in deleted_answer_uuids:
-                        # This answer was deleted as an orphan in
-                        # step 3; treat it as a brand-new row.
-                        existing = None
-                    else:
-                        existing = db_answer_by_uuid.get(json_a.uuid)
+                    existing = db_answer_by_uuid.get(json_a.uuid)
                     if existing is not None:
                         if not self._answer_matches_db(json_a, existing):
                             existing.answer_text = json_a.answer_text

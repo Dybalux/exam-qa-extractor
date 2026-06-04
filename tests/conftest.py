@@ -60,6 +60,7 @@ import alembic  # noqa: E402  (intentional late import after path fix)
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -86,8 +87,15 @@ async def db_engine():
     """Provide a fresh in-memory async SQLite engine per test.
 
     Using a shared in-memory db (via `StaticPool`-style engine) so
-    multiple sessions see the same data within a single test. The
+    multiple sessions can see the same data within a single test. The
     engine is disposed at teardown, releasing the in-memory store.
+
+    Foreign-key enforcement is enabled per connection via a sync
+    event listener. SQLite ships with FK enforcement OFF by default;
+    without this pragma, tests that rely on FK violations (e.g.
+    ``test_apply_rolls_back_on_missing_image_id_fk``) would not
+    trigger ``IntegrityError`` and the rollback safety net would be
+    untestable.
     """
     from sqlalchemy.pool import StaticPool
 
@@ -97,6 +105,16 @@ async def db_engine():
         poolclass=StaticPool,
         future=True,
     )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        """Run ``PRAGMA foreign_keys = ON`` on every new DBAPI connection."""
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys = ON")
+        finally:
+            cursor.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     try:
