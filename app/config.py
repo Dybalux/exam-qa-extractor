@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
 
+    # Import (JSON metadata backup/restore). Distinct from `max_upload_size`
+    # because the two domains may diverge in the future (e.g. raising image
+    # upload to 50 MB without raising the JSON import cap).
+    max_import_size_mb: int = 10
+
     # OCR
     tesseract_cmd: str = "tesseract"
     tesseract_lang: str = "spa"
