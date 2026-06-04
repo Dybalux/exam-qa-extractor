@@ -1,5 +1,6 @@
 """Answer model for question answers."""
 
+import uuid as _uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text
@@ -28,6 +29,14 @@ class Answer(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Cross-DB identity used by the export/import flow. See app.models.exam.
+    uuid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        index=True,
+        default=lambda: str(_uuid.uuid4()),
+        nullable=False,
+    )
     question_id: Mapped[int] = mapped_column(
         ForeignKey("questions.id", ondelete="CASCADE"),
         nullable=False,

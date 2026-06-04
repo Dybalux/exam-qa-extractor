@@ -1,5 +1,6 @@
 """Question model for extracted exam questions."""
 
+import uuid as _uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, Float, ForeignKey, Index, Integer, String, Text
@@ -35,6 +36,14 @@ class Question(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Cross-DB identity used by the export/import flow. See app.models.exam.
+    uuid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        index=True,
+        default=lambda: str(_uuid.uuid4()),
+        nullable=False,
+    )
     exam_id: Mapped[int] = mapped_column(
         ForeignKey("exams.id", ondelete="CASCADE"),
         nullable=False,

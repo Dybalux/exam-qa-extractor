@@ -1,5 +1,6 @@
 """Exam model for organizing exam documents."""
 
+import uuid as _uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -30,6 +31,16 @@ class Exam(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Cross-DB identity used by the export/import flow. Stable across
+    # databases; default is Python uuid4() so service code that does
+    # not pass an explicit uuid still gets a unique value at INSERT.
+    uuid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        index=True,
+        default=lambda: str(_uuid.uuid4()),
+        nullable=False,
+    )
     partial_number: Mapped[int] = mapped_column(nullable=False)
     exam_date: Mapped[date | None] = mapped_column(nullable=True)
     topic_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
