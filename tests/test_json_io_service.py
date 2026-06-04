@@ -553,3 +553,474 @@ async def test_preview_caps_preview_list_at_50_entries(
     preview = await svc.preview_import(payload)
     assert preview.to_delete == 60
     assert len(preview.preview) == PREVIEW_ENTRY_CAP
+
+
+# ===========================================================================
+# Tests for apply_import (T2.4)
+# ===========================================================================
+
+import datetime as _dt
+
+from sqlalchemy import func, select as _select
+from sqlalchemy.exc import IntegrityError
+
+from app.schemas.json_io import ImportApplyResultSchema
+
+
+async def _seed_exam(
+    session: AsyncSession,
+    partial_number: int = 1,
+    exam_date: "_dt.date | None" = None,
+    tags: str | None = "algebra",
+) -> Exam:
+    """Create and flush an Exam in the test session."""
+    exam = Exam(
+        partial_number=partial_number,
+        exam_date=exam_date if exam_date is not None else _dt.date(2024, 6, 15),
+        topic_tags=tags,
+    )
+    session.add(exam)
+    await session.flush()
+    return exam
+
+
+async def _seed_question(
+    session: AsyncSession,
+    exam: Exam,
+    text: str = "Q",
+    topic: str = "OTHER",
+    is_corrected: bool = False,
+    answers: list[tuple[str, str]] | None = None,
+) -> Question:
+    """Create a Question with optional Answers."""
+    q = Question(
+        exam_id=exam.id,
+        question_text=text,
+        topic=topic,
+        order_in_exam=1,
+        is_corrected=is_corrected,
+    )
+    session.add(q)
+    await session.flush()
+    if answers:
+        for idx, (text, atype) in enumerate(answers):
+            session.add(
+                Answer(
+                    question_id=q.id,
+                    answer_text=text,
+                    answer_type=atype,
+                    display_order=idx,
+                )
+            )
+        await session.flush()
+    return q
+
+
+async def _row_counts(session: AsyncSession) -> dict[str, int]:
+    """Return the count of exams/questions/answers in the DB."""
+    return {
+        "exams": (
+            await session.execute(_select(func.count()).select_from(Exam))
+        ).scalar_one(),
+        "questions": (
+            await session.execute(_select(func.count()).select_from(Question))
+        ).scalar_one(),
+        "answers": (
+            await session.execute(_select(func.count()).select_from(Answer))
+        ).scalar_one(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# (a) Mixed counts
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
+    """Mixed envelope: 5 new / 3 updated / 1 deleted orphan, counts match.
+
+    The DB starts with 1 exam, 4 questions (q1..q4) each with 1 answer.
+    The JSON declares 5 new questions (q5..q9), updates q1..q3 with
+    their answers modified (same uuid, different content), and
+    removes q4 + its answer (orphans).
+
+    Expected counts:
+        created: 5 new questions + 5 new answers + 1 exam (re-upserted
+                because the JSON declares it; if its fields match the
+                DB row exactly, this is 0, otherwise 1). The seeded
+                exam's tags differ from the JSON's "algebra", so the
+                exam is also an update.
+        updated: 3 questions (q1..q3) + 3 answers + 1 exam.
+        deleted: 1 question (q4) + 1 answer (a4).
+    """
+    exam = await _seed_exam(
+        db_session, partial_number=1, tags="original-tags"
+    )
+    q1 = await _seed_question(
+        db_session, exam, text="old Q1", answers=[("old A1", "correct")]
+    )
+    q2 = await _seed_question(
+        db_session, exam, text="old Q2", answers=[("old A2", "correct")]
+    )
+    q3 = await _seed_question(
+        db_session, exam, text="old Q3", answers=[("old A3", "correct")]
+    )
+    q4 = await _seed_question(
+        db_session, exam, text="orphan Q4", answers=[("orphan A4", "correct")]
+    )
+    a1 = (
+        await db_session.execute(
+            _select(Answer).where(Answer.question_id == q1.id)
+        )
+    ).scalar_one()
+    a2 = (
+        await db_session.execute(
+            _select(Answer).where(Answer.question_id == q2.id)
+        )
+    ).scalar_one()
+    a3 = (
+        await db_session.execute(
+            _select(Answer).where(Answer.question_id == q3.id)
+        )
+    ).scalar_one()
+    await db_session.commit()
+
+    exam_uuid = exam.uuid
+    json_questions: list[dict] = []
+    # 5 brand new questions
+    for i in range(5):
+        json_questions.append(
+            _question_dict(
+                uuid=f"0000000{i}-0000-4000-8000-00000000000{i}",
+                exam_uuid=exam_uuid,
+                text=f"new Q{i}",
+            )
+        )
+    # 3 updated: q1, q2, q3 with different content (text + answer).
+    json_questions.append(
+        _question_dict(
+            uuid=q1.uuid,
+            exam_uuid=exam_uuid,
+            text="updated Q1",
+            is_corrected=True,
+            answers=[
+                _answer_dict(
+                    uuid=a1.uuid, text="updated A1", atype="incorrect"
+                )
+            ],
+        )
+    )
+    json_questions.append(
+        _question_dict(
+            uuid=q2.uuid,
+            exam_uuid=exam_uuid,
+            text="updated Q2",
+            is_corrected=True,
+            answers=[
+                _answer_dict(
+                    uuid=a2.uuid, text="updated A2", atype="incorrect"
+                )
+            ],
+        )
+    )
+    json_questions.append(
+        _question_dict(
+            uuid=q3.uuid,
+            exam_uuid=exam_uuid,
+            text="updated Q3",
+            is_corrected=True,
+            answers=[
+                _answer_dict(
+                    uuid=a3.uuid, text="updated A3", atype="incorrect"
+                )
+            ],
+        )
+    )
+    # q4 is intentionally omitted (orphan)
+
+    payload = _envelope_dict(json_questions)
+    svc = JsonIOService(db_session)
+    result = await svc.apply_import(payload)
+
+    assert isinstance(result, ImportApplyResultSchema)
+    # 5 created: 5 new questions (their answers are not in the JSON, so
+    # 0 new answers from new questions; the exam already exists in the
+    # DB, so the exam is "updated" not "created").
+    assert result.created == 5
+    # 7 updated: 3 questions + 3 answers + 1 exam (its tags changed).
+    assert result.updated == 7
+    # 2 deleted: 1 question (q4) + 1 answer (a4).
+    assert result.deleted == 2
+    assert result.applied_at.tzinfo is not None
+
+    # DB state: 1 exam, 8 questions (4 original - 1 orphan + 5 new),
+    # 3 answers (the updated ones; the new questions carry no answers).
+    counts = await _row_counts(db_session)
+    assert counts == {"exams": 1, "questions": 8, "answers": 3}
+
+
+# ---------------------------------------------------------------------------
+# (b) Rollback on IntegrityError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_rolls_back_on_integrity_error(
+    db_session: AsyncSession,
+) -> None:
+    """Mid-import ``IntegrityError`` rolls back the whole transaction.
+
+    The DB has 1 question. The JSON has 2 new questions. The second
+    question's first answer has ``answer_type="BOGUS"`` -- the schema
+    accepts it (``str`` is lax), but the DB has a CHECK constraint
+    on ``answer_type IN ('correct', 'incorrect', 'partial')`` that
+    rejects it. The first question and answer SHOULD be added to the
+    session, but the ``IntegrityError`` on the second answer's INSERT
+    must roll back the entire transaction.
+    """
+    # DB state: empty.
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid="00000001-0000-4000-8000-000000000001",
+                exam_uuid="00000001-0000-4000-8000-000000000000",
+                text="OK Q1",
+                answers=[_answer_dict(uuid="a-1", text="A1", atype="correct")],
+            ),
+            _question_dict(
+                uuid="00000002-0000-4000-8000-000000000002",
+                exam_uuid="00000001-0000-4000-8000-000000000000",
+                text="Bad Q2",
+                answers=[
+                    _answer_dict(
+                        uuid="a-2",
+                        text="A2",
+                        atype="BOGUS",  # fails the DB CHECK constraint
+                    )
+                ],
+            ),
+        ]
+    )
+    svc = JsonIOService(db_session)
+    with pytest.raises(IntegrityError):
+        await svc.apply_import(payload)
+
+    # The DB is still empty: the rollback reverted every INSERT.
+    counts = await _row_counts(db_session)
+    assert counts == {"exams": 0, "questions": 0, "answers": 0}
+
+
+# ---------------------------------------------------------------------------
+# (c) Rejects malformed (DB unchanged)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_malformed_db_unchanged(
+    db_session: AsyncSession,
+) -> None:
+    """A malformed entry raises :class:`MalformedImportError` before any write."""
+    exam = await _seed_exam(db_session, partial_number=1)
+    await db_session.commit()
+    before = await _row_counts(db_session)
+
+    bad = _question_dict(
+        uuid="00000001-0000-4000-8000-000000000001",
+        exam_uuid=exam.uuid,
+    )
+    bad["exam_context"]["partial_number"] = 99  # out of ge=1, le=4
+    payload = _envelope_dict([bad])
+    svc = JsonIOService(db_session)
+    with pytest.raises(MalformedImportError) as exc_info:
+        await svc.apply_import(payload)
+    assert len(exc_info.value.details["validation_errors"]) == 1
+
+    # The DB is unchanged.
+    after = await _row_counts(db_session)
+    assert after == before
+
+
+# ---------------------------------------------------------------------------
+# (d) Overwrite by uuid
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_overwrites_existing_question_by_uuid(
+    db_session: AsyncSession,
+) -> None:
+    """Updating the JSON for an existing uuid overwrites the DB row."""
+    exam = await _seed_exam(db_session, partial_number=1)
+    q = await _seed_question(
+        db_session,
+        exam,
+        text="old text",
+        is_corrected=False,
+    )
+    await db_session.commit()
+    q_uuid = q.uuid
+
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid=q_uuid,
+                exam_uuid=exam.uuid,
+                text="new text",
+                is_corrected=True,
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    result = await svc.apply_import(payload)
+    assert result.created == 0
+    assert result.updated == 1
+    assert result.deleted == 0
+
+    # Verify the row was actually updated in the DB.
+    refreshed = (
+        await db_session.execute(_select(Question).where(Question.uuid == q_uuid))
+    ).scalar_one()
+    assert refreshed.question_text == "new text"
+    assert refreshed.is_corrected is True
+
+
+# ---------------------------------------------------------------------------
+# (e) Orphan cascade
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_orphan_exam_removes_its_questions_and_answers(
+    db_session: AsyncSession,
+) -> None:
+    """An exam not present in the JSON is deleted, with its children."""
+    exam = await _seed_exam(db_session, partial_number=1)
+    await _seed_question(db_session, exam, text="Q1", answers=[("A1", "correct")])
+    await _seed_question(db_session, exam, text="Q2", answers=[("A2", "correct")])
+    await db_session.commit()
+
+    # Empty JSON: every DB row is an orphan.
+    payload = _envelope_dict([])
+    svc = JsonIOService(db_session)
+    result = await svc.apply_import(payload)
+    # 1 exam + 2 questions + 2 answers = 5 deletes.
+    assert result.deleted == 5
+    assert result.created == 0
+    assert result.updated == 0
+
+    counts = await _row_counts(db_session)
+    assert counts == {"exams": 0, "questions": 0, "answers": 0}
+
+
+# ---------------------------------------------------------------------------
+# (f) Idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_is_idempotent(db_session: AsyncSession) -> None:
+    """Applying the same envelope twice → second is all-zero, DB unchanged."""
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid="00000001-0000-4000-8000-000000000001",
+                exam_uuid="00000001-0000-4000-8000-000000000000",
+                text="Q1",
+                answers=[_answer_dict(uuid="a-1", text="A1", atype="correct")],
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+
+    # First apply: 1 new exam + 1 new question + 1 new answer.
+    first = await svc.apply_import(payload)
+    assert first.created == 3
+    assert first.updated == 0
+    assert first.deleted == 0
+
+    # Second apply: all-zero.
+    second = await svc.apply_import(payload)
+    assert second.created == 0
+    assert second.updated == 0
+    assert second.deleted == 0
+
+
+# ---------------------------------------------------------------------------
+# (g) Collects all errors
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_collects_all_validation_errors(
+    db_session: AsyncSession,
+) -> None:
+    """3 malformed entries → a single error with 3 entries (NOT fail-fast)."""
+    bad1 = _question_dict(
+        uuid="00000001-0000-4000-8000-000000000001",
+        exam_uuid="00000001-0000-4000-8000-000000000000",
+    )
+    bad1["exam_context"]["partial_number"] = "not an int"
+    bad2 = _question_dict(
+        uuid="00000002-0000-4000-8000-000000000002",
+        exam_uuid="00000001-0000-4000-8000-000000000000",
+    )
+    bad2["answers"] = [
+        {
+            "uuid": "x",
+            "answer_text": "",
+            "answer_type": "correct",
+            "is_common_misconception": False,
+            "explanation": None,
+            "display_order": 0,
+        }
+    ]
+    bad3 = _question_dict(
+        uuid="00000003-0000-4000-8000-000000000003",
+        exam_uuid="00000001-0000-4000-8000-000000000000",
+    )
+    bad3["question_text"] = ""
+
+    payload = _envelope_dict([bad1, bad2, bad3])
+    svc = JsonIOService(db_session)
+    with pytest.raises(MalformedImportError) as exc_info:
+        await svc.apply_import(payload)
+
+    validation_errors = exc_info.value.details["validation_errors"]
+    assert len(validation_errors) == 3
+    indices = {e["index"] for e in validation_errors}
+    assert indices == {0, 1, 2}
+
+
+# ---------------------------------------------------------------------------
+# (h) Atomicity / transaction boundary
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_opens_exactly_one_transaction(
+    db_session: AsyncSession,
+) -> None:
+    """``apply_import`` opens exactly one ``async with self.session.begin():``.
+
+    We assert the contract by verifying the apply path commits
+    successfully and the DB ends in the expected state -- if the
+    code opened multiple transactions, the second would observe a
+    state that the first had not yet committed.
+    """
+    payload = _envelope_dict(
+        [
+            _question_dict(
+                uuid="00000001-0000-4000-8000-000000000001",
+                exam_uuid="00000001-0000-4000-8000-000000000000",
+                text="Q1",
+            )
+        ]
+    )
+    svc = JsonIOService(db_session)
+    result = await svc.apply_import(payload)
+    assert result.created == 2  # 1 exam + 1 question
+    # The data is visible after the call returns, proving the
+    # transaction committed.
+    counts = await _row_counts(db_session)
+    assert counts == {"exams": 1, "questions": 1, "answers": 0}

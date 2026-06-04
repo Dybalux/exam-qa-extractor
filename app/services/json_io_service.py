@@ -50,6 +50,7 @@ from app.schemas.json_io import (
     AnswerExportSchema,
     ExamContextExportSchema,
     ExportFileSchema,
+    ImportApplyResultSchema,
     ImportPreviewSchema,
     QuestionExportSchema,
 )
@@ -457,4 +458,265 @@ class JsonIOService:
             to_delete=to_delete,
             validation_errors=[],
             preview=preview,
+        )
+
+    # ------------------------------------------------------------------
+    # Import: apply (atomic, destructive, full restore)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _answer_matches_db(
+        json_a: AnswerExportSchema, db_a: "Answer"
+    ) -> bool:
+        """Return True iff the JSON answer matches the DB row's fields.
+
+        Only fields present in :class:`AnswerExportSchema` are
+        compared. A match means the apply path treats the row as
+        unchanged (no UPDATE issued, ``updated`` counter not
+        incremented). This is what makes the second apply of an
+        identical envelope return ``updated=0`` (idempotency).
+        """
+        return (
+            db_a.answer_text == json_a.answer_text
+            and db_a.answer_type == json_a.answer_type
+            and db_a.is_common_misconception == json_a.is_common_misconception
+            and db_a.explanation == json_a.explanation
+            and db_a.display_order == json_a.display_order
+        )
+
+    async def apply_import(
+        self, json_data: dict | ExportFileSchema
+    ) -> ImportApplyResultSchema:
+        """Apply an import envelope: full restore, atomic, destructive.
+
+        The DB ends up exactly equal to the JSON's intent: rows
+        whose uuid is in the JSON are upserted (overwrite-by-uuid,
+        JSON wins); rows whose uuid is NOT in the JSON are deleted
+        (full-restore, including orphan children).
+
+        The whole operation runs in exactly ONE
+        ``async with self.session.begin():`` transaction. On any
+        exception (Pydantic error, DB ``IntegrityError``, anything),
+        the context manager rolls back automatically — the DB is
+        left in its pre-import state.
+
+        Idempotency
+        -----------
+
+        Because the apply path uses per-field comparison (the same
+        helper :meth:`_question_matches_db` the preview path uses),
+        a second apply of an envelope that already matches the DB
+        returns ``created=0, updated=0, deleted=0`` — a true
+        no-op. The plan requires this; the design's example did
+        not, so the implementation follows the plan.
+
+        Order inside the transaction
+        ----------------------------
+
+        1. Parse ALL questions, collect every error, raise
+           :class:`MalformedImportError` if any (no writes yet).
+        2. Compute orphan set-diffs (answers → questions → exams).
+        3. DELETE orphan answers, then orphan questions, then
+           orphan exams (children before parents — explicit even
+           though cascade handles it; the plan calls for the
+           explicit ordering).
+        4. UPSERT exams by uuid.
+        5. ``session.flush()`` (assigns ids to new exams).
+        6. UPSERT questions by uuid.
+        7. ``session.flush()`` (assigns ids to new questions).
+        8. UPSERT answers by uuid.
+
+        NO ``session.merge()`` (per design decision): the upsert
+        is explicit ``SELECT by uuid; if exists: update; else:
+        insert`` so the per-row "created vs updated" count is
+        unambiguous.
+
+        Raises
+        ------
+        UnknownSchemaVersion
+            If ``schema_version`` is not in ``SUPPORTED_VERSIONS``.
+        MalformedImportError
+            If any question entry fails Pydantic validation. The
+            transaction is NOT opened (validation runs first).
+        sqlalchemy.exc.IntegrityError
+            (or any other DB error) mid-transaction. The context
+            manager rolls back; the DB is unchanged.
+        """
+        # Lazy imports keep this module free of ORM imports at
+        # module load time.
+        from app.models.answer import Answer
+        from app.models.exam import Exam
+        from app.models.question import Question
+
+        # Step 1: parse + collect errors. No writes yet.
+        _, parsed_questions = self._parse_envelope(json_data)
+
+        json_exam_uuids: set[str] = {q.exam_context.uuid for q in parsed_questions}
+        json_question_uuids: set[str] = {q.uuid for q in parsed_questions}
+        json_answer_uuids: set[str] = {
+            a.uuid for q in parsed_questions for a in q.answers
+        }
+
+        async with self.session.begin():
+            # Step 2: read DB state in O(1) queries.
+            db_questions = await self._load_questions_with_relations()
+            db_question_by_uuid: dict[str, Question] = {
+                q.uuid: q for q in db_questions
+            }
+            db_exam_by_uuid: dict[str, Exam] = {
+                q.exam.uuid: q.exam for q in db_questions
+            }
+            db_answers_result = await self.session.execute(select(Answer))
+            db_answers = list(db_answers_result.scalars().all())
+            db_answer_by_uuid: dict[str, Answer] = {a.uuid: a for a in db_answers}
+
+            created = 0
+            updated = 0
+            deleted = 0
+
+            # Step 3: DELETE orphans (children first). Track
+            # ``deleted_answer_uuids`` so step 8 doesn't try to
+            # re-update an answer that was just deleted here.
+            deleted_answer_uuids: set[str] = set()
+            for ans_uuid in list(db_answer_by_uuid.keys()):
+                if ans_uuid not in json_answer_uuids:
+                    await self.session.delete(db_answer_by_uuid[ans_uuid])
+                    deleted += 1
+                    deleted_answer_uuids.add(ans_uuid)
+            for q_uuid in list(db_question_by_uuid.keys()):
+                if q_uuid not in json_question_uuids:
+                    await self.session.delete(db_question_by_uuid[q_uuid])
+                    deleted += 1
+            for e_uuid in list(db_exam_by_uuid.keys()):
+                if e_uuid not in json_exam_uuids:
+                    await self.session.delete(db_exam_by_uuid[e_uuid])
+                    deleted += 1
+
+            # Step 4: UPSERT exams by uuid. ``exam_map`` starts from
+            # the surviving (non-orphan) DB rows; we add newly
+            # created Exam instances as we encounter them.
+            exam_map: dict[str, Exam] = {
+                uuid: e
+                for uuid, e in db_exam_by_uuid.items()
+                if uuid in json_exam_uuids
+            }
+            for json_q in parsed_questions:
+                ec = json_q.exam_context
+                existing = exam_map.get(ec.uuid)
+                if existing is not None:
+                    if (
+                        existing.partial_number != ec.partial_number
+                        or existing.exam_date != ec.exam_date
+                        or existing.topic_tags != ec.topic_tags
+                    ):
+                        existing.partial_number = ec.partial_number
+                        existing.exam_date = ec.exam_date
+                        existing.topic_tags = ec.topic_tags
+                        updated += 1
+                else:
+                    new_exam = Exam(
+                        uuid=ec.uuid,
+                        partial_number=ec.partial_number,
+                        exam_date=ec.exam_date,
+                        topic_tags=ec.topic_tags,
+                    )
+                    self.session.add(new_exam)
+                    exam_map[ec.uuid] = new_exam
+                    created += 1
+
+            # Step 5: flush so newly-created exams get their ids.
+            await self.session.flush()
+
+            # Step 6: UPSERT questions by uuid. ``question_map`` is
+            # seeded from surviving DB rows.
+            question_map: dict[str, Question] = {
+                uuid: q
+                for uuid, q in db_question_by_uuid.items()
+                if uuid in json_question_uuids
+            }
+            for json_q in parsed_questions:
+                exam = exam_map[json_q.exam_context.uuid]
+                existing = question_map.get(json_q.uuid)
+                if existing is not None:
+                    if not self._question_matches_db(
+                        json_q, existing, existing.exam
+                    ):
+                        existing.question_text = json_q.question_text
+                        existing.extracted_text = json_q.extracted_text
+                        existing.topic = json_q.topic
+                        existing.order_in_exam = json_q.order_in_exam
+                        existing.is_corrected = json_q.is_corrected
+                        existing.correction_notes = json_q.correction_notes
+                        existing.has_code_in_answers = (
+                            json_q.has_code_in_answers
+                        )
+                        updated += 1
+                else:
+                    new_q = Question(
+                        uuid=json_q.uuid,
+                        exam_id=exam.id,
+                        question_text=json_q.question_text,
+                        extracted_text=json_q.extracted_text,
+                        topic=json_q.topic,
+                        order_in_exam=json_q.order_in_exam,
+                        is_corrected=json_q.is_corrected,
+                        correction_notes=json_q.correction_notes,
+                        has_code_in_answers=json_q.has_code_in_answers,
+                    )
+                    self.session.add(new_q)
+                    question_map[json_q.uuid] = new_q
+                    created += 1
+
+            # Step 7: flush so newly-created questions get their ids.
+            await self.session.flush()
+
+            # Step 8: UPSERT answers by uuid. The parent's id is
+            # taken from ``question_map`` (which now has ids for
+            # both surviving and newly-created questions).
+            for json_q in parsed_questions:
+                parent_q = question_map[json_q.uuid]
+                for json_a in json_q.answers:
+                    if json_a.uuid in deleted_answer_uuids:
+                        # This answer was deleted as an orphan in
+                        # step 3; treat it as a brand-new row.
+                        existing = None
+                    else:
+                        existing = db_answer_by_uuid.get(json_a.uuid)
+                    if existing is not None:
+                        if not self._answer_matches_db(json_a, existing):
+                            existing.answer_text = json_a.answer_text
+                            existing.answer_type = json_a.answer_type
+                            existing.is_common_misconception = (
+                                json_a.is_common_misconception
+                            )
+                            existing.explanation = json_a.explanation
+                            existing.display_order = json_a.display_order
+                            updated += 1
+                    else:
+                        new_a = Answer(
+                            uuid=json_a.uuid,
+                            question_id=parent_q.id,
+                            answer_text=json_a.answer_text,
+                            answer_type=json_a.answer_type,
+                            is_common_misconception=(
+                                json_a.is_common_misconception
+                            ),
+                            explanation=json_a.explanation,
+                            display_order=json_a.display_order,
+                        )
+                        self.session.add(new_a)
+                        created += 1
+
+        self._logger.info(
+            "apply_import committed created=%d updated=%d deleted=%d",
+            created,
+            updated,
+            deleted,
+        )
+
+        return ImportApplyResultSchema(
+            created=created,
+            updated=updated,
+            deleted=deleted,
+            applied_at=datetime.now(timezone.utc),
         )
