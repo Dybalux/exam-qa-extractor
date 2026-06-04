@@ -66,6 +66,18 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Importing the models here is required so they register with
+# ``app.db.base.Base`` before the ``db_engine`` fixture calls
+# ``Base.metadata.create_all``. Without this, the in-memory test
+# database has no tables and every endpoint that touches the DB
+# raises "no such table: exams". The HTTP-using tests in
+# ``tests/api/`` used to import the models themselves; with this
+# conftest-level import, the ``client`` fixture works for any
+# test that uses it without each test having to remember the
+# import.
+from app.models import Answer  # noqa: F401
+from app.models import Exam  # noqa: F401
+from app.models import Question  # noqa: F401
 from app.db.base import Base
 
 
