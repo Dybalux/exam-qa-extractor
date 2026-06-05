@@ -567,6 +567,172 @@ async def test_import_returns_400_on_unknown_schema_version(
 
 
 # ---------------------------------------------------------------------------
+# End-to-end round-trip tests (PR 3c, T3.4 acceptance contract)
+#
+# These tests exercise the FULL HTTP path: seed DB → POST /api/v1/export
+# → optionally mutate the exported JSON → POST /api/v1/import?confirm=true.
+# They pin the dashboard's expected click-through: the "Vista previa"
+# button hits /api/v1/import (no confirm), and the "Confirmar import"
+# button hits /api/v1/import?confirm=true.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_e2e_export_then_import_same_file_yields_zero_changes(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Round-trip: export then import the same body → no changes, DB unchanged.
+
+    Seeds a small DB (1 exam, 1 question, 1 answer), exports it, then
+    applies the export back with ``?confirm=true``. The result must be
+    all-zero counts AND the re-exported envelope must equal the original
+    envelope (modulo the server-side ``exported_at`` timestamp), which
+    is the strongest "DB is byte-equal to its pre-import state"
+    assertion we can make at the HTTP boundary.
+    """
+    exam = Exam(partial_number=1, topic_tags="seed")
+    db_session.add(exam)
+    await db_session.flush()
+    question = Question(
+        exam_id=exam.id,
+        question_text="Original text",
+        topic="OTHER",
+        order_in_exam=1,
+        difficulty=3,
+    )
+    db_session.add(question)
+    await db_session.flush()
+    answer = Answer(
+        question_id=question.id,
+        answer_text="A",
+        answer_type=AnswerType.CORRECT.value,
+        display_order=0,
+    )
+    db_session.add(answer)
+    await db_session.commit()
+
+    # 1. First export.
+    first = await client.post("/api/v1/export")
+    assert first.status_code == 200, first.text
+    first_envelope = first.json()
+    # Capture the uuids we'll assert on after the round-trip.
+    assert len(first_envelope["questions"]) == 1
+    captured_question_uuid = first_envelope["questions"][0]["uuid"]
+    captured_question_text = first_envelope["questions"][0]["question_text"]
+    captured_exam_uuid = first_envelope["questions"][0]["exam_context"]["uuid"]
+
+    # 2. Apply the same envelope with ?confirm=true. All counts must be 0
+    #    because every row is identical to what's in the DB.
+    response = await client.post(
+        "/api/v1/import?confirm=true",
+        files={
+            "file": (
+                "backup.json",
+                json.dumps(first_envelope).encode("utf-8"),
+                "application/json",
+            )
+        },
+    )
+    assert response.status_code == 201, response.text
+    result = ImportApplyResultSchema.model_validate(response.json())
+    assert result.created == 0, result
+    assert result.updated == 0, result
+    assert result.deleted == 0, result
+
+    # 3. Re-export and assert the body is byte-equal to the first export
+    #    (modulo the server-side exported_at timestamp, which always
+    #    advances and isn't part of the data contract).
+    second = await client.post("/api/v1/export")
+    assert second.status_code == 200, second.text
+    second_envelope = second.json()
+
+    # Normalize: drop the server-controlled ``exported_at`` from both
+    # envelopes so the comparison is purely on the data shape.
+    first_norm = {**first_envelope}
+    second_norm = {**second_envelope}
+    first_norm.pop("exported_at", None)
+    second_norm.pop("exported_at", None)
+    assert first_norm == second_norm, (
+        "Round-trip changed the DB: first={first_norm} second={second_norm}"
+    )
+
+    # Spot-check: the question's text and the uuids are preserved.
+    assert second_envelope["questions"][0]["uuid"] == captured_question_uuid
+    assert second_envelope["questions"][0]["question_text"] == captured_question_text
+    assert (
+        second_envelope["questions"][0]["exam_context"]["uuid"]
+        == captured_exam_uuid
+    )
+
+
+@pytest.mark.asyncio
+async def test_e2e_export_then_import_modified_file_yields_expected_changes(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Export, modify the JSON, then import → the change is applied.
+
+    Seeds one question, exports it, mutates the ``question_text`` in
+    the exported JSON, and applies with ``?confirm=true``. The plan
+    accepts ``updated=1`` OR ``created=1`` (depending on what the
+    service's diff counts as a change); we assert the question_text in
+    the DB now matches the new value AND at least one row was touched.
+    """
+    exam = Exam(partial_number=1, topic_tags="seed")
+    db_session.add(exam)
+    await db_session.flush()
+    question = Question(
+        exam_id=exam.id,
+        question_text="Original text",
+        topic="OTHER",
+        order_in_exam=1,
+        difficulty=3,
+    )
+    db_session.add(question)
+    await db_session.commit()
+
+    # 1. Export.
+    response = await client.post("/api/v1/export")
+    assert response.status_code == 200, response.text
+    envelope = response.json()
+    assert len(envelope["questions"]) == 1
+
+    # 2. Mutate the question's text in the JSON we just exported.
+    original_uuid = envelope["questions"][0]["uuid"]
+    envelope["questions"][0]["question_text"] = "Modified text after round-trip"
+
+    # 3. Apply the mutated envelope.
+    response = await client.post(
+        "/api/v1/import?confirm=true",
+        files={
+            "file": (
+                "backup.json",
+                json.dumps(envelope).encode("utf-8"),
+                "application/json",
+            )
+        },
+    )
+    assert response.status_code == 201, response.text
+    result = ImportApplyResultSchema.model_validate(response.json())
+
+    # The plan accepts updated=1 or created=1; we pin the weaker
+    # "at least one row was touched" and the strict "the new text is
+    # in the DB" — the strong contract for this test.
+    assert (result.created + result.updated) >= 1, result
+    # No deletions on this path (we didn't drop the row from the JSON).
+    assert result.deleted == 0, result
+
+    # 4. Re-export and assert the new text is the one the DB has.
+    second = await client.post("/api/v1/export")
+    assert second.status_code == 200, second.text
+    second_envelope = second.json()
+    assert len(second_envelope["questions"]) == 1
+    assert second_envelope["questions"][0]["uuid"] == original_uuid
+    assert second_envelope["questions"][0]["question_text"] == (
+        "Modified text after round-trip"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test helpers (reused by the import tests above)
 # ---------------------------------------------------------------------------
 
