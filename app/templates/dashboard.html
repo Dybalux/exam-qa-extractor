@@ -4,6 +4,7 @@
 {% block page_title %}Dashboard{% endblock %}
 {% block page_subtitle %}<p class="page-subtitle">Resumen del sistema de estudio</p>{% endblock %}
 {% block page_actions %}
+  <button id="export-btn" type="button" class="btn btn-outline">⬇ Descargar backup</button>
   <a href="/practice" class="btn btn-primary">▶ Iniciar práctica</a>
 {% endblock %}
 
@@ -115,6 +116,66 @@
       <p class="text-muted">Sin exámenes. <a href="/exams/new">Crear uno</a>.</p>
     </div>
     {% endfor %}
+  </div>
+</div>
+
+{# Backup / restore card. The controls are wired in               #}
+{# app/static/js/import-export.js (T3.4). The IDs are the contract  #}
+{# between this template and the JS module.                        #}
+<div class="card mt-6">
+  <div class="card-header">
+    <h3 class="card-title">Importar backup</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-sm text-muted mb-4">
+      Subí un archivo JSON generado con "Descargar backup" para restaurar
+      exámenes, preguntas y respuestas. Te mostraremos una vista previa
+      antes de aplicar los cambios.
+    </p>
+    <div class="flex items-center gap-3" style="flex-wrap:wrap">
+      <input type="file" id="import-file-input" accept="application/json,.json" hidden>
+      <button type="button" id="import-pick-btn" class="btn btn-outline">
+        Elegir archivo...
+      </button>
+      <span id="import-filename-label" class="text-sm text-muted">
+        Ningún archivo seleccionado
+      </span>
+      <button type="button" id="preview-btn" class="btn btn-primary" disabled>
+        Vista previa
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{# Import preview modal — the contract surface for T3.4. #}
+{# Count placeholders are filled by the JS module.        #}
+{% block extra_scripts %}
+<div id="import-preview-modal" class="modal" role="dialog"
+     aria-labelledby="import-preview-title" aria-modal="true" hidden>
+  <div class="modal-backdrop" data-import-modal-close></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="import-preview-title">Vista previa del import</h3>
+      <button type="button" class="modal-close" data-import-modal-close
+              aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>El archivo importará los siguientes cambios:</p>
+      <div style="display:flex; gap:24px; margin: 16px 0; flex-wrap:wrap">
+        <div><strong>Crear:</strong> <span id="prev-create">0</span></div>
+        <div><strong>Actualizar:</strong> <span id="prev-update">0</span></div>
+        <div><strong>Eliminar:</strong> <span id="prev-delete">0</span></div>
+      </div>
+      <div id="import-errors" class="modal-error" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" id="import-cancel-btn"
+              data-import-modal-close>Cancelar</button>
+      <button type="button" class="btn btn-primary" id="import-confirm-btn">
+        Confirmar import
+      </button>
+    </div>
   </div>
 </div>
 {% endblock %}
