@@ -237,40 +237,6 @@ async def test_export_uses_dedicated_logger_name(
     )
 
 
-@pytest.mark.asyncio
-async def test_export_includes_difficulty_image_id_confidence_score(
-    db_session: AsyncSession,
-) -> None:
-    """Export must carry ``difficulty``, ``image_id`` and ``confidence_score``.
-
-    These three fields were previously omitted from the export shape
-    and silently fell back to model defaults on import -- a data-loss
-    bug. The fix is: export the actual values from the ORM, so a
-    round-trip preserves them.
-    """
-    exam = Exam(partial_number=1, topic_tags="t")
-    db_session.add(exam)
-    await db_session.flush()
-    q = Question(
-        exam_id=exam.id,
-        question_text="Q",
-        topic="OTHER",
-        order_in_exam=1,
-        difficulty=5,  # non-default
-        confidence_score=0.87,  # non-default
-        # image_id left as None (default)
-    )
-    db_session.add(q)
-    await db_session.commit()
-
-    svc = JsonIOService(db_session)
-    envelope = await svc.export_full_db()
-    exported_q = envelope.questions[0]
-    assert exported_q.difficulty == 5
-    assert exported_q.image_id is None
-    assert exported_q.confidence_score == 0.87
-
-
 # ===========================================================================
 # Tests for preview_import (T2.3)
 # ===========================================================================
@@ -306,7 +272,6 @@ def _question_dict(
     is_corrected: bool = False,
     answers: list[dict] | None = None,
     topic: str = "OTHER",
-    difficulty: int = 3,
     image_id: int | None = None,
     confidence_score: float | None = None,
 ) -> dict:
@@ -328,7 +293,6 @@ def _question_dict(
         "is_corrected": is_corrected,
         "correction_notes": None,
         "has_code_in_answers": False,
-        "difficulty": difficulty,
         "image_id": image_id,
         "confidence_score": confidence_score,
         "answers": answers,
@@ -1067,150 +1031,13 @@ async def test_apply_opens_exactly_one_transaction(
 
 
 # ---------------------------------------------------------------------------
-# (i) Round-trip preservation for difficulty / image_id / confidence_score
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_apply_round_trip_preserves_difficulty_and_confidence_score(
-    db_session: AsyncSession,
-) -> None:
-    """Export → apply → re-export must preserve ``difficulty`` and ``confidence_score``.
-
-    Before the schema gap fix, these two fields were silently reset
-    to their model defaults on import. This test pins the new
-    contract: a JSON built with ``difficulty=5, confidence_score=0.91``
-    imports cleanly and the re-export reads back the same values.
-    """
-    # Apply an envelope with non-default difficulty + confidence_score.
-    payload = _envelope_dict(
-        [
-            _question_dict(
-                uuid="00000001-0000-4000-8000-000000000001",
-                exam_uuid="00000001-0000-4000-8000-000000000000",
-                text="Q1",
-                difficulty=5,
-                confidence_score=0.91,
-            )
-        ]
-    )
-    svc = JsonIOService(db_session)
-    result = await svc.apply_import(payload)
-    assert result.created == 2  # exam + question
-
-    # Re-export and confirm the values are still there.
-    envelope = await svc.export_full_db()
-    assert len(envelope.questions) == 1
-    exported_q = envelope.questions[0]
-    assert exported_q.difficulty == 5
-    assert exported_q.confidence_score == 0.91
-
-    # And previewing the same JSON back must report zero changes
-    # (idempotency check on the new fields).
-    preview = await svc.preview_import(payload)
-    assert preview.to_create == 0
-    assert preview.to_update == 0
-    assert preview.to_delete == 0
-
-
-@pytest.mark.asyncio
-async def test_preview_detects_difficulty_change(
-    db_session: AsyncSession,
-) -> None:
-    """A change in ``difficulty`` alone must register as ``to_update=1``.
-
-    This pins the diff-helper contract: the previous version of
-    ``_question_matches_db`` ignored ``difficulty``, so editing
-    only that field in the JSON would not be detected. The fix
-    adds the field to the comparison.
-    """
-    exam = Exam(partial_number=1, topic_tags="t")
-    db_session.add(exam)
-    await db_session.flush()
-    q = Question(
-        exam_id=exam.id,
-        question_text="Q",
-        topic="OTHER",
-        order_in_exam=1,
-        difficulty=3,  # current DB value
-    )
-    db_session.add(q)
-    await db_session.commit()
-
-    # Build a payload with the SAME uuid but a different difficulty.
-    payload = _envelope_dict(
-        [
-            _question_dict(
-                uuid=q.uuid,
-                exam_uuid=exam.uuid,
-                text="Q",
-                difficulty=5,  # changed
-            )
-        ]
-    )
-    svc = JsonIOService(db_session)
-    preview = await svc.preview_import(payload)
-    assert preview.to_create == 0
-    assert preview.to_update == 1
-    assert preview.to_delete == 0
-
-
-@pytest.mark.asyncio
-async def test_apply_overwrites_difficulty_on_existing_question(
-    db_session: AsyncSession,
-) -> None:
-    """A second apply that changes only ``difficulty`` must issue exactly 1 UPDATE.
-
-    Confirms the apply path writes the field to the DB (not just
-    diffs it). This is the write-side counterpart of the preview
-    detection test above.
-    """
-    # First apply: difficulty=3.
-    base_payload = _envelope_dict(
-        [
-            _question_dict(
-                uuid="00000001-0000-4000-8000-000000000001",
-                exam_uuid="00000001-0000-4000-8000-000000000000",
-                text="Q1",
-                difficulty=3,
-            )
-        ]
-    )
-    svc = JsonIOService(db_session)
-    first = await svc.apply_import(base_payload)
-    assert first.created == 2  # exam + question
-
-    # Second apply: same uuid, same text, different difficulty.
-    modified = _envelope_dict(
-        [
-            _question_dict(
-                uuid="00000001-0000-4000-8000-000000000001",
-                exam_uuid="00000001-0000-4000-8000-000000000000",
-                text="Q1",
-                difficulty=5,  # changed
-            )
-        ]
-    )
-    second = await svc.apply_import(modified)
-    assert second.created == 0
-    assert second.updated == 1
-    assert second.deleted == 0
-
-    # Re-export and confirm the new difficulty stuck.
-    envelope = await svc.export_full_db()
-    assert envelope.questions[0].difficulty == 5
-
-
-# ---------------------------------------------------------------------------
 # (j) Per-field diff sensitivity (closes the verify-report WARNING on the
 #     early-return branches of ``_question_matches_db``).
 #
 #     The helper compares every question/answer field one-by-one; if any
-#     field differs, it returns ``False`` early. The WARNING was that
-#     only ``difficulty`` had a focused "change just this field" test.
-#     This parameterized case walks the remaining 16 fields and pins
-#     the contract: a change in ANY of them must register as
-#     ``to_update=1``.
+#     field differs, it returns ``False`` early. This parameterized case
+#     walks the fields and pins the contract: a change in ANY of them
+#     must register as ``to_update=1``.
 # ---------------------------------------------------------------------------
 
 
@@ -1228,7 +1055,6 @@ _BASELINE_QUESTION = {
     "is_corrected": False,
     "correction_notes": None,
     "has_code_in_answers": False,
-    "difficulty": 3,
     "image_id": None,
     "confidence_score": None,
     "exam_partial_number": 1,
@@ -1263,7 +1089,6 @@ def _build_diff_payload(
         "is_corrected": _BASELINE_QUESTION["is_corrected"],
         "correction_notes": _BASELINE_QUESTION["correction_notes"],
         "has_code_in_answers": _BASELINE_QUESTION["has_code_in_answers"],
-        "difficulty": _BASELINE_QUESTION["difficulty"],
         "image_id": _BASELINE_QUESTION["image_id"],
         "confidence_score": _BASELINE_QUESTION["confidence_score"],
         "exam_context": {
@@ -1351,7 +1176,6 @@ async def _seed_baseline_question(
         is_corrected=_BASELINE_QUESTION["is_corrected"],
         correction_notes=_BASELINE_QUESTION["correction_notes"],
         has_code_in_answers=_BASELINE_QUESTION["has_code_in_answers"],
-        difficulty=_BASELINE_QUESTION["difficulty"],
         image_id=_BASELINE_QUESTION["image_id"],
         confidence_score=_BASELINE_QUESTION["confidence_score"],
     )
@@ -1372,8 +1196,7 @@ async def _seed_baseline_question(
     return exam, q, a
 
 
-# The 16 fields ``_question_matches_db`` compares, minus ``difficulty``
-# (already covered by ``test_preview_detects_difficulty_change``).
+# The fields ``_question_matches_db`` compares.
 _DIFF_SENSITIVITY_FIELDS = [
     "question_text",
     "extracted_text",

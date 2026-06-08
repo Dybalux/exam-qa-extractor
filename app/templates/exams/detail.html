@@ -69,11 +69,6 @@
         </td>
         <td><span class="badge topic-{{ q.topic }}">{{ q.topic }}</span></td>
         <td>
-          <span class="text-xs font-mono" style="color:var(--warning-light)">
-            {{ '★' * q.difficulty }}{{ '☆' * (5 - q.difficulty) }}
-          </span>
-        </td>
-        <td>
           {% if q.is_ready_for_practice %}
             <span class="badge badge-success">✓ Lista</span>
           {% else %}

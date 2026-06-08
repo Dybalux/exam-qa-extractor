@@ -92,12 +92,11 @@ class QuestionExportSchema(BaseModel):
 
     The schema carries every user-editable field of the ``Question``
     row that is meaningful to restore on import, including
-    ``difficulty``, ``image_id`` and ``confidence_score``. The
-    previous version of this schema omitted these three fields; the
-    apply path silently fell back to model defaults, which is a
-    data-loss bug for any question whose difficulty, image link or
-    OCR confidence had been edited in the source DB. They are now
-    part of the round-trip contract.
+    ``image_id`` and ``confidence_score``. The previous version of
+    this schema omitted these fields; the apply path silently fell
+    back to model defaults, which is a data-loss bug for any question
+    whose image link or OCR confidence had been edited in the source
+    DB. They are now part of the round-trip contract.
 
     ``image_id`` is intentionally NOT re-mapped to ``None`` on
     import. The destination DB either has the same ``exam_images``
@@ -118,7 +117,6 @@ class QuestionExportSchema(BaseModel):
     is_corrected: bool
     correction_notes: str | None
     has_code_in_answers: bool
-    difficulty: int = Field(..., ge=1, le=5)
     image_id: int | None
     confidence_score: float | None
     answers: list[AnswerExportSchema] = Field(default_factory=list)

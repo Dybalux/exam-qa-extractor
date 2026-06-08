@@ -46,7 +46,7 @@ class PracticeService:
             user_session_id: Browser/user session identifier
             mode: Practice mode (random, by_partial, by_topic, exam_simulation)
             exam_id: Optional exam to restrict questions
-            filters: Optional dict with keys: topic, difficulty_min, difficulty_max
+            filters: Optional dict with keys: topic
             total_questions: Number of questions for this session (1-100)
 
         Returns:
@@ -406,7 +406,7 @@ class PracticeService:
 
         Args:
             exam_id: Optional exam ID filter
-            filters: Dict with optional keys: topic, difficulty_min, difficulty_max
+            filters: Dict with optional keys: topic
 
         Returns:
             List of ready-for-practice questions
@@ -418,12 +418,6 @@ class PracticeService:
 
         if topic := filters.get("topic"):
             query = query.where(Question.topic == topic)
-
-        if diff_min := filters.get("difficulty_min"):
-            query = query.where(Question.difficulty >= diff_min)
-
-        if diff_max := filters.get("difficulty_max"):
-            query = query.where(Question.difficulty <= diff_max)
 
         result = await self.session.execute(query)
         all_questions = result.scalars().all()

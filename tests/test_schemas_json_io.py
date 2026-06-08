@@ -70,7 +70,6 @@ def _canonical_question() -> dict:
         "is_corrected": False,
         "correction_notes": None,
         "has_code_in_answers": False,
-        "difficulty": 3,
         "image_id": None,
         "confidence_score": None,
         "answers": [_canonical_answer()],
@@ -156,26 +155,8 @@ def test_question_export_schema_defaults_answers_to_empty_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Difficulty / image_id / confidence_score (round-trip preservation)
+# image_id / confidence_score (round-trip preservation)
 # ---------------------------------------------------------------------------
-
-
-def test_question_export_schema_requires_difficulty() -> None:
-    """``difficulty`` is part of the round-trip contract; missing → reject."""
-    payload = _canonical_envelope()
-    payload["questions"][0].pop("difficulty")
-    with pytest.raises(ValidationError) as exc_info:
-        ExportFileSchema.model_validate(payload)
-    assert "difficulty" in str(exc_info.value)
-
-
-def test_question_export_schema_rejects_difficulty_out_of_range() -> None:
-    """``difficulty`` is ``ge=1, le=5``; 0 and 6 must be rejected."""
-    for bad_value in (0, 6):
-        payload = _canonical_envelope()
-        payload["questions"][0]["difficulty"] = bad_value
-        with pytest.raises(ValidationError):
-            ExportFileSchema.model_validate(payload)
 
 
 def test_question_export_schema_accepts_null_image_id_and_confidence_score() -> None:

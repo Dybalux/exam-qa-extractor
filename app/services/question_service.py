@@ -31,7 +31,6 @@ class QuestionService:
         question_text: str,
         topic: str = TopicEnum.OTHER.value,
         order_in_exam: int | None = None,
-        difficulty: int = 3,
         image_id: int | None = None,
         extracted_text: str | None = None,
         confidence_score: float | None = None,
@@ -43,7 +42,6 @@ class QuestionService:
             question_text: Text of the question
             topic: Topic classification
             order_in_exam: Position in the exam (1-50)
-            difficulty: Difficulty level (1-5)
             image_id: Optional source image ID
             extracted_text: Raw OCR-extracted text
             confidence_score: OCR confidence score
@@ -69,12 +67,6 @@ class QuestionService:
                 details={"valid_topics": list(valid_topics)},
             )
 
-        if not (1 <= difficulty <= 5):
-            raise ValidationError(
-                "difficulty must be between 1 and 5",
-                details={"difficulty": difficulty},
-            )
-
         if order_in_exam is not None and not (1 <= order_in_exam <= 50):
             raise ValidationError(
                 "order_in_exam must be between 1 and 50",
@@ -86,7 +78,6 @@ class QuestionService:
             question_text=question_text.strip(),
             topic=topic,
             order_in_exam=order_in_exam,
-            difficulty=difficulty,
             image_id=image_id,
             extracted_text=extracted_text,
             confidence_score=confidence_score,
@@ -127,7 +118,6 @@ class QuestionService:
         topic: str | None = None,
         is_corrected: bool | None = None,
         is_ready_for_practice: bool | None = None,
-        difficulty: int | None = None,
     ) -> Sequence[Question]:
         """List questions with optional filtering.
 
@@ -136,7 +126,6 @@ class QuestionService:
             topic: Filter by topic
             is_corrected: Filter by correction status
             is_ready_for_practice: Filter by practice readiness (has correct answer)
-            difficulty: Filter by difficulty level
 
         Returns:
             List of questions
@@ -151,9 +140,6 @@ class QuestionService:
 
         if is_corrected is not None:
             query = query.where(Question.is_corrected == is_corrected)
-
-        if difficulty is not None:
-            query = query.where(Question.difficulty == difficulty)
 
         query = query.order_by(Question.order_in_exam.asc().nullslast(), Question.id.asc())
 
@@ -173,7 +159,6 @@ class QuestionService:
         question_id: int,
         question_text: str | None = None,
         topic: str | None = None,
-        difficulty: int | None = None,
         order_in_exam: int | None = None,
         correction_notes: str | None = None,
         is_corrected: bool | None = None,
@@ -185,7 +170,6 @@ class QuestionService:
             question_id: Question ID
             question_text: New question text
             topic: New topic classification
-            difficulty: New difficulty level (1-5)
             order_in_exam: New position in exam (1-50)
             correction_notes: Notes about the correction
             is_corrected: Mark as manually corrected
@@ -213,14 +197,6 @@ class QuestionService:
                     details={"valid_topics": list(valid_topics)},
                 )
             question.topic = topic
-
-        if difficulty is not None:
-            if not (1 <= difficulty <= 5):
-                raise ValidationError(
-                    "difficulty must be between 1 and 5",
-                    details={"difficulty": difficulty},
-                )
-            question.difficulty = difficulty
 
         if order_in_exam is not None:
             if not (1 <= order_in_exam <= 50):
@@ -302,7 +278,7 @@ class QuestionService:
         Args:
             exam_id: Exam ID
             questions_data: List of dicts with keys: question_text, extracted_text,
-                            confidence_score, topic, order_in_exam, difficulty
+                            confidence_score, topic, order_in_exam
             image_id: Optional source image ID
 
         Returns:
@@ -329,7 +305,6 @@ class QuestionService:
                 confidence_score=data.get("confidence_score"),
                 topic=data.get("topic", TopicEnum.OTHER.value),
                 order_in_exam=data.get("order_in_exam", i),
-                difficulty=data.get("difficulty", 3),
             )
             self.session.add(question)
             questions.append(question)

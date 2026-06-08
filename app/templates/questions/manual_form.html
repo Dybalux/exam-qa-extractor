@@ -35,18 +35,6 @@
         </div>
 
         <div class="form-row">
-          {# Difficulty #}
-          <div class="form-group">
-            <label class="form-label">Dificultad *</label>
-            <select name="difficulty" class="form-control" required>
-              <option value="1" {% if form_data and form_data.difficulty == '1' %}selected{% endif %}>1 ★</option>
-              <option value="2" {% if form_data and form_data.difficulty == '2' %}selected{% endif %}>2 ★★</option>
-              <option value="3" {% if form_data and form_data.difficulty == '3' %}selected{% endif %}>3 ★★★</option>
-              <option value="4" {% if form_data and form_data.difficulty == '4' %}selected{% endif %}>4 ★★★★</option>
-              <option value="5" {% if form_data and form_data.difficulty == '5' %}selected{% endif %}>5 ★★★★★</option>
-            </select>
-          </div>
-
           {# Order in exam #}
           <div class="form-group">
             <label class="form-label">Número en examen</label>

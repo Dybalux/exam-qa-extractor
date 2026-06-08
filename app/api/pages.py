@@ -343,7 +343,6 @@ async def manual_question_create(
     # Extract form data
     question_text = form.get("question_text", "").strip()
     topic = form.get("topic", "")
-    difficulty = int(form.get("difficulty", 3))
     order_in_exam = form.get("order_in_exam")
     correct_answer_text = form.get("correct_answer_text", "").strip()
     explanation = form.get("explanation", "").strip() or None
@@ -373,7 +372,6 @@ async def manual_question_create(
             question_text=question_text,
             topic=topic,
             order_in_exam=int(order_in_exam) if order_in_exam else None,
-            difficulty=difficulty,
             image_id=None,  # No image since it's manual
             extracted_text=None,
             confidence_score=None,

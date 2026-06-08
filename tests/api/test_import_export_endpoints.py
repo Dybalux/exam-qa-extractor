@@ -130,7 +130,6 @@ async def test_export_endpoint_populated_db(
         extracted_text="2 + 2",
         topic=TopicEnum.OTHER.value,
         order_in_exam=1,
-        difficulty=3,
     )
     db_session.add(question)
     await db_session.flush()
@@ -165,7 +164,6 @@ async def test_export_endpoint_populated_db(
     assert exported.question_text == "What is 2 + 2?"
     assert exported.extracted_text == "2 + 2"
     assert exported.order_in_exam == 1
-    assert exported.difficulty == 3
 
     # Answers are nested; sort order is by display_order (the service
     # sorts ascending before serializing).
@@ -303,7 +301,6 @@ def _envelope_file(
                 "is_corrected": False,
                 "correction_notes": None,
                 "has_code_in_answers": False,
-                "difficulty": 3,
                 "image_id": None,
                 "confidence_score": None,
                 "answers": [],
@@ -598,7 +595,6 @@ async def test_e2e_export_then_import_same_file_yields_zero_changes(
         question_text="Original text",
         topic="OTHER",
         order_in_exam=1,
-        difficulty=3,
     )
     db_session.add(question)
     await db_session.flush()
@@ -685,7 +681,6 @@ async def test_e2e_export_then_import_modified_file_yields_expected_changes(
         question_text="Original text",
         topic="OTHER",
         order_in_exam=1,
-        difficulty=3,
     )
     db_session.add(question)
     await db_session.commit()
@@ -756,7 +751,6 @@ def _question_dict(
     is_corrected: bool = False,
     answers: list[dict] | None = None,
     topic: str = "OTHER",
-    difficulty: int = 3,
     image_id: int | None = None,
     confidence_score: float | None = None,
 ) -> dict:
@@ -778,7 +772,6 @@ def _question_dict(
         "is_corrected": is_corrected,
         "correction_notes": None,
         "has_code_in_answers": False,
-        "difficulty": difficulty,
         "image_id": image_id,
         "confidence_score": confidence_score,
         "answers": answers,
