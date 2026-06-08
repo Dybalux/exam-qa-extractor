@@ -9,6 +9,21 @@ A web application for extracting questions from Operating Systems exam images us
 - **Answer Management**: Add correct and incorrect answers for practice mode
 - **Practice Mode**: Interactive quiz with immediate feedback
 - **Study Analytics**: Track progress and identify weak areas
+- **Backup & Restore**: Export all data to JSON and import it back (cross-environment sync, backups, sharing study sets)
+
+## Backup & Restore
+
+The dashboard includes export/import controls to move exam data between environments or create offline backups.
+
+**Export:** click "⬇ Descargar backup" to download a JSON file with all exams, questions, and answers.
+
+**Import:** pick a previously exported JSON file and click "Vista previa" to see a dry-run diff (create/update/delete counts). Click "Confirmar import" to apply — the import is a **full restore** (the DB ends up identical to the JSON; records not in the JSON are deleted).
+
+**Safety:**
+- Preview without `?confirm=true` never touches the DB
+- Malformed entries reject the entire import (no partial writes)
+- Max file size: 10 MB (configurable via `MAX_IMPORT_SIZE_MB`)
+- `IntegrityError` mid-import triggers automatic rollback
 
 ## Prerequisites
 
@@ -93,11 +108,11 @@ black app tests
 ```
 image_to_text/
 ├── app/
-│   ├── api/            # API routes and schemas
+│   ├── api/            # API routes and schemas (incl. import_export.py)
 │   ├── core/           # Exceptions, constants, config
 │   ├── db/             # Database configuration
 │   ├── models/         # SQLAlchemy models
-│   ├── services/       # Business logic
+│   ├── services/       # Business logic (incl. json_io_service.py)
 │   ├── templates/      # Jinja2 templates
 │   └── static/         # CSS, JS, images
 ├── alembic/            # Database migrations
