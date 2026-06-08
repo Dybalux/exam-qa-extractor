@@ -386,7 +386,7 @@ if (reorderList) {
    */
   function hideToast(toast) {
     toast.classList.add('toast-hiding');
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(() => toast.remove(), 800);
   }
 
   /**

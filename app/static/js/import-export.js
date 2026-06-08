@@ -74,7 +74,7 @@
       if (removed) return;
       removed = true;
       toast.classList.add('toast-hiding');
-      setTimeout(() => toast.remove(), 300);
+      setTimeout(() => toast.remove(), 800);
     };
     toast.addEventListener('click', close);
     toast.querySelector('.toast-close').addEventListener('click', (e) => {

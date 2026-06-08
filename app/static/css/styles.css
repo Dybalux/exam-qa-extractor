@@ -505,13 +505,13 @@ tr:hover td { background: var(--bg-elevated); }
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  animation: toastSlideIn 0.3s ease;
+  animation: toastSlideIn 0.8s ease;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
 
 .toast.toast-hiding {
-  animation: toastSlideOut 0.3s ease forwards;
+  animation: toastSlideOut 0.8s ease forwards;
 }
 
 .toast-success {
