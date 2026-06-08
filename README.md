@@ -1,5 +1,7 @@
 # Exam Study System
 
+**[Leer en español](README.es.md)**
+
 A web application for extracting questions from Operating Systems exam images using OCR, managing them with answers, and practicing through an interactive quiz interface.
 
 ## Features
