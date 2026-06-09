@@ -1,0 +1,13 @@
+services:
+  app:
+    build: { context: ., dockerfile: Dockerfile }
+    image: exam-qa-extractor:latest
+    container_name: exam-qa-extractor
+    ports: ["8000:8000"]
+    env_file: [.env]
+    volumes:
+      - ./data/db:/app/data/db
+      - ./data/uploads:/app/data/uploads
+      - ./data/backups:/app/data/backups
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000"]
+    restart: unless-stopped
