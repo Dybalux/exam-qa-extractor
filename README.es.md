@@ -35,24 +35,24 @@ La forma más rápida de poner en marcha la aplicación.
 - Docker Engine ≥ 24 y Compose v2
 
 ### Inicio rápido
-1. Cree los directorios de datos:
+1. Creá los directorios de datos:
    ```bash
    mkdir -p data/db data/uploads data/backups
    ```
-2. Configure el entorno:
+2. Configurá el entorno:
    ```bash
    cp .env.example .env
-   # Edite .env y complete OPENAI_API_KEY y SECRET_KEY
+   # Editá .env y completá OPENAI_API_KEY y SECRET_KEY
    ```
-3. Ajuste los permisos (solo si su usuario del host no es UID 1000):
+3. Ajustá los permisos (solo si tu usuario del host no es UID 1000):
    ```bash
    chown -R 1000:1000 ./data
    ```
-4. Inicie el stack:
+4. Iniciá el stack:
    ```bash
    docker compose up -d --build
    ```
-5. Verifique:
+5. Verificá:
    ```bash
    curl -fsS http://localhost:8000/health
    ```
@@ -76,7 +76,7 @@ docker compose down
 docker rmi exam-qa-extractor:latest
 git revert HEAD~3..HEAD   # deshace los tres commits de Docker
 ```
-Sus datos en el host no se ven afectados.
+Tus datos en el host no se ven afectados.
 
 ## Requisitos Previos
 
