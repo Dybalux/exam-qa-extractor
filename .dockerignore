@@ -1,0 +1,12 @@
+.env .env.* !.env.example
+data/
+database.db *.db *.sqlite *.sqlite3
+uploads/ backup_json/ exam_images/
+*.jpg *.jpeg *.png *.gif *.pdf
+__pycache__/ *.py[cod]
+.pytest_cache/ .mypy_cache/ .ruff_cache/ htmlcov/ .coverage
+*.egg-info/ .venv/ venv/ env/ build/ dist/ *.egg
+.git/ .gitignore .gitattributes
+.vscode/ .idea/ .DS_Store
+openspec/ .atl/
+README.md README.es.md
