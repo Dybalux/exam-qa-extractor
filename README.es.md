@@ -27,6 +27,72 @@ El dashboard incluye controles de exportación/importación para mover datos de 
 - Tamaño máximo de archivo: 10 MB (configurable via `MAX_IMPORT_SIZE_MB`)
 - `IntegrityError` durante la importación dispara rollback automático
 
+## Arquitectura
+
+Servicio FastAPI de un solo proceso. El navegador habla con páginas HTML (Jinja2) y una API JSON. Detrás de la API, una capa de servicios habla con SQLite, Tesseract OCR local, OpenAI Vision opcional, y el sistema de archivos.
+
+```mermaid
+graph LR
+    User([User])
+
+    subgraph Container[Docker Container]
+        direction TB
+        UI[Jinja2 Templates<br/>+ JS / CSS]
+        API[FastAPI<br/>:8000]
+        SVC[Service Layer<br/>OCR · Storage · JSON I/O<br/>Exam · Question · Practice]
+        DB[(SQLite<br/>data/db)]
+        UP[/uploads/]
+        BK[/backups/]
+    end
+
+    Tesseract[Tesseract OCR<br/>local binary]
+    OpenAI[OpenAI Vision<br/>optional]
+
+    User <--> UI
+    UI <--> API
+    API <--> SVC
+    SVC <--> DB
+    SVC <--> Tesseract
+    SVC -.opt.-> OpenAI
+    SVC --> UP
+    SVC --> BK
+```
+
+### Flujo principal: subir una imagen de examen
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant B as Browser
+    participant A as FastAPI
+    participant O as Tesseract
+    participant V as OpenAI (opt)
+    participant D as SQLite
+
+    U->>B: Upload exam image
+    B->>A: POST /api/v1/exams
+    A->>A: Validate · store in uploads/
+    A->>O: Extract text
+    O-->>A: Raw text
+    alt OPENAI_API_KEY set
+        A->>V: Enhance with Vision
+        V-->>A: Structured Q&A
+    end
+    A->>D: INSERT questions
+    A-->>B: 201 Created
+    B-->>U: Preview · review · confirm
+```
+
+### Dónde vive cada cosa
+
+| Componente | Vive en | ¿Se persiste? |
+|-----------|----------|------------|
+| SQLite DB | `data/db/database.db` | Sí (volumen) |
+| Imágenes subidas | `data/uploads/` | Sí (volumen) |
+| Backups en JSON | `data/backups/` | Sí (volumen) |
+| Binario Tesseract | Dentro de la imagen | No |
+| API key de OpenAI | `.env` (`OPENAI_API_KEY`) | No (solo runtime) |
+
 ## Ejecutar con Docker
 
 La forma más rápida de poner en marcha la aplicación.

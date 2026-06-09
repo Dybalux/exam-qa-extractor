@@ -27,6 +27,72 @@ The dashboard includes export/import controls to move exam data between environm
 - Max file size: 10 MB (configurable via `MAX_IMPORT_SIZE_MB`)
 - `IntegrityError` mid-import triggers automatic rollback
 
+## Architecture
+
+Single-process FastAPI service. The browser talks to HTML pages (Jinja2) and a JSON API. Behind the API, a service layer talks to SQLite, local Tesseract OCR, optional OpenAI Vision, and the local filesystem.
+
+```mermaid
+graph LR
+    User([User])
+
+    subgraph Container[Docker Container]
+        direction TB
+        UI[Jinja2 Templates<br/>+ JS / CSS]
+        API[FastAPI<br/>:8000]
+        SVC[Service Layer<br/>OCR · Storage · JSON I/O<br/>Exam · Question · Practice]
+        DB[(SQLite<br/>data/db)]
+        UP[/uploads/]
+        BK[/backups/]
+    end
+
+    Tesseract[Tesseract OCR<br/>local binary]
+    OpenAI[OpenAI Vision<br/>optional]
+
+    User <--> UI
+    UI <--> API
+    API <--> SVC
+    SVC <--> DB
+    SVC <--> Tesseract
+    SVC -.opt.-> OpenAI
+    SVC --> UP
+    SVC --> BK
+```
+
+### Main flow: upload an exam image
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant B as Browser
+    participant A as FastAPI
+    participant O as Tesseract
+    participant V as OpenAI (opt)
+    participant D as SQLite
+
+    U->>B: Upload exam image
+    B->>A: POST /api/v1/exams
+    A->>A: Validate · store in uploads/
+    A->>O: Extract text
+    O-->>A: Raw text
+    alt OPENAI_API_KEY set
+        A->>V: Enhance with Vision
+        V-->>A: Structured Q&A
+    end
+    A->>D: INSERT questions
+    A-->>B: 201 Created
+    B-->>U: Preview · review · confirm
+```
+
+### Where things live
+
+| Component | Lives in | Persisted? |
+|-----------|----------|------------|
+| SQLite DB | `data/db/database.db` | Yes (volume) |
+| Uploaded images | `data/uploads/` | Yes (volume) |
+| JSON backups | `data/backups/` | Yes (volume) |
+| Tesseract binary | Inside the image | No |
+| OpenAI API key | `.env` (`OPENAI_API_KEY`) | No (runtime only) |
+
 ## Run with Docker
 
 The fastest way to get the app running.
