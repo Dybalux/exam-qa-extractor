@@ -27,6 +27,57 @@ El dashboard incluye controles de exportación/importación para mover datos de 
 - Tamaño máximo de archivo: 10 MB (configurable via `MAX_IMPORT_SIZE_MB`)
 - `IntegrityError` durante la importación dispara rollback automático
 
+## Ejecutar con Docker
+
+La forma más rápida de poner en marcha la aplicación.
+
+### Requisitos
+- Docker Engine ≥ 24 y Compose v2
+
+### Inicio rápido
+1. Cree los directorios de datos:
+   ```bash
+   mkdir -p data/db data/uploads data/backups
+   ```
+2. Configure el entorno:
+   ```bash
+   cp .env.example .env
+   # Edite .env y complete OPENAI_API_KEY y SECRET_KEY
+   ```
+3. Ajuste los permisos (solo si su usuario del host no es UID 1000):
+   ```bash
+   chown -R 1000:1000 ./data
+   ```
+4. Inicie el stack:
+   ```bash
+   docker compose up -d --build
+   ```
+5. Verifique:
+   ```bash
+   curl -fsS http://localhost:8000/health
+   ```
+
+El contenedor ejecuta `alembic upgrade head` automáticamente en el primer arranque y en cada arranque posterior, de modo que la base de datos se mantiene siempre actualizada.
+
+### Modo desarrollo (recarga en vivo)
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+Las ediciones en archivos bajo `app/` o `alembic/` disparan una recarga automática.
+
+### Dónde se guardan los datos
+- Base de datos SQLite: `./data/db/database.db`
+- Imágenes subidas: `./data/uploads/`
+- Backups en JSON: `./data/backups/`
+
+### Reversión
+```bash
+docker compose down
+docker rmi exam-qa-extractor:latest
+git revert HEAD~3..HEAD   # deshace los tres commits de Docker
+```
+Sus datos en el host no se ven afectados.
+
 ## Requisitos Previos
 
 - Python 3.11+

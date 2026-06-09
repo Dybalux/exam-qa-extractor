@@ -27,6 +27,57 @@ The dashboard includes export/import controls to move exam data between environm
 - Max file size: 10 MB (configurable via `MAX_IMPORT_SIZE_MB`)
 - `IntegrityError` mid-import triggers automatic rollback
 
+## Run with Docker
+
+The fastest way to get the app running.
+
+### Prerequisites
+- Docker Engine ≥ 24 and Compose v2
+
+### Quickstart
+1. Create data directories:
+   ```bash
+   mkdir -p data/db data/uploads data/backups
+   ```
+2. Configure environment:
+   ```bash
+   cp .env.example .env
+   # Edit .env and fill in OPENAI_API_KEY and SECRET_KEY
+   ```
+3. Fix permissions (only if your host user is not UID 1000):
+   ```bash
+   chown -R 1000:1000 ./data
+   ```
+4. Start the stack:
+   ```bash
+   docker compose up -d --build
+   ```
+5. Verify:
+   ```bash
+   curl -fsS http://localhost:8000/health
+   ```
+
+The container runs `alembic upgrade head` automatically on first start and on every subsequent startup, so your database is always up to date.
+
+### Development mode (live reload)
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+Edits to files under `app/` or `alembic/` trigger an automatic reload.
+
+### Where data lives
+- SQLite database: `./data/db/database.db`
+- Uploaded images: `./data/uploads/`
+- JSON backups: `./data/backups/`
+
+### Rollback
+```bash
+docker compose down
+docker rmi exam-qa-extractor:latest
+git revert HEAD~3..HEAD   # undo the three Docker commits
+```
+Your data on the host is untouched.
+
 ## Prerequisites
 
 - Python 3.11+
