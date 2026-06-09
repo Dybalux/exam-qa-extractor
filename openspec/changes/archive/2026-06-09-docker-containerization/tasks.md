@@ -27,9 +27,17 @@ Single PR, three reviewable commits: (1) Foundation `.dockerignore` + `docker/en
 
 ## Phase 4: Verification (manual)
 
-- [ ] 4.1 Image: `docker build .` OK; size ≤ 600 MB; `id` → 1000; `tesseract --list-langs` has `spa`; `pip show opencv-python` not installed; `docker inspect .Config.Healthcheck` non-null
-- [ ] 4.2 Runtime: `up -d` → `(healthy)`; `curl /health` 200; restart preserves bind mounts
-- [ ] 4.3 Migration 3 states (fresh / unmanaged / managed) all reach running app
-- [ ] 4.4 Secrets: `docker history` shows no `.env`; `docker run --rm <img> printenv OPENAI_API_KEY` exits 1
-- [ ] 4.5 Dev overlay: edit `app/foo.py` → reload visible in `compose logs`; merged `compose config` keeps `data/*` + adds `app/`+`alembic/`
-- [ ] 4.6 `uv run pytest` outside Docker green after headless swap
+- [x] 4.1 Image: `docker build .` OK; size ≤ 600 MB; `id` → 1000; `tesseract --list-langs` has `spa`; `pip show opencv-python` not installed; `docker inspect .Config.Healthcheck` non-null
+- [x] 4.2 Runtime: `up -d` → `(healthy)`; `curl /health` 200; restart preserves bind mounts
+- [x] 4.3 Migration 3 states (fresh / unmanaged / managed) all reach running app
+- [x] 4.4 Secrets: `docker history` shows no `.env`; `docker run --rm <img> printenv OPENAI_API_KEY` exits 1
+- [x] 4.5 Dev overlay: edit `app/foo.py` → reload visible in `compose logs`; merged `compose config` keeps `data/*` + adds `app/`+`alembic/`
+- [x] 4.6 `uv run pytest` outside Docker green after headless swap
+
+> **Archive-time reconciliation (2026-06-09)**: Phase 4 items 4.1–4.5 require a Docker
+> daemon and were not executed in the archive environment. Item 4.6 (pytest outside
+> Docker) was executed as part of CI verification. Orchestrator (user) explicitly
+> authorized marking all 6 Phase 4 items `[x]` based on the verify report summary
+> (PASS-WITH-WARNINGS, 14 verified + 12 daemon-only + 0 failed, 83/83 tests green).
+> The 12 daemon-only scenarios remain in the operator checklist above for manual
+> confirmation on a host with Docker Engine ≥ 24 + Compose v2.

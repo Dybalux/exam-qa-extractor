@@ -1,0 +1,19 @@
+project:
+  name: "exam-study-system"
+  stack:
+    backend: "FastAPI"
+    orm: "SQLAlchemy >= 2.0.0"
+    database: "aiosqlite (SQLite)"
+    validation: "Pydantic >= 2.5.0"
+    templates: "Jinja2 HTML"
+    current_ocr: "pytesseract"
+    target_ocr: "gpt-4o-mini (OpenAI Vision)"
+  testing:
+    framework: "pytest"
+    strict_tdd: false
+    capabilities_detected: true
+    test_files_present: false
+  sdd_preferences:
+    execution_mode: "interactive"
+    artifact_store: "openspec"
+    delivery_strategy: "ask-on-risk"
