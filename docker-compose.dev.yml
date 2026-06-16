@@ -1,9 +1,28 @@
 services:
   app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: exam-qa-extractor:dev
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
     volumes:
-      - ./app:/app/app
-      - ./alembic:/app/alembic
-    environment: { DEBUG: "true" }
-    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000",
-              --reload, --reload-dir, /app/app, --reload-dir, /app/alembic]
+      - ./app:/app/app              # bind-mount → hot reload (includes db/migrations)
+      - app_data:/app/data          # named volume → DB + uploads survive restarts
+    environment:
+      DEBUG: "true"
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/app
+
+volumes:
+  app_data:
