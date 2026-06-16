@@ -48,6 +48,12 @@ for _entry in sys.path:
         sys.path.insert(0, _entry)
         break
 
+# Re-add project root at the END so 'import app' resolves correctly.
+# The installed alembic (at position 0) takes precedence over project's
+# alembic/ dir; app/ is only in the project root so this is safe.
+if _PROJECT_ROOT not in sys.path:
+    sys.path.append(_PROJECT_ROOT)
+
 # Drop any cached `alembic` modules.
 for _name in [n for n in list(sys.modules) if n == "alembic" or n.startswith("alembic.")]:
     sys.modules.pop(_name, None)

@@ -1,5 +1,7 @@
 # Exam Study System
 
+[![CI](https://github.com/Dybalux/exam-qa-extractor/actions/workflows/ci.yml/badge.svg)](https://github.com/Dybalux/exam-qa-extractor/actions/workflows/ci.yml)
+
 **[Leer en español](README.es.md)**
 
 A web application for extracting questions from Operating Systems exam images using OCR, managing them with answers, and practicing through an interactive quiz interface.
