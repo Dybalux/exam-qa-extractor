@@ -61,9 +61,7 @@ def _attachment_filename(content_disposition: str) -> str:
     that silently matches the empty string.
     """
     m = re.search(r'filename="([^"]+)"', content_disposition)
-    assert m, (
-        f"Content-Disposition missing filename: {content_disposition!r}"
-    )
+    assert m, f"Content-Disposition missing filename: {content_disposition!r}"
     return m.group(1)
 
 
@@ -224,8 +222,7 @@ async def test_export_endpoint_is_registered_at_correct_url(
     # Positive: the export endpoint exists at the top-level API prefix.
     response = await client.post("/api/v1/export")
     assert response.status_code == 200, (
-        f"POST /api/v1/export expected 200, got {response.status_code}: "
-        f"{response.text}"
+        f"POST /api/v1/export expected 200, got {response.status_code}: {response.text}"
     )
 
     # Negative: it must NOT be reachable under /exams/. FastAPI
@@ -347,19 +344,13 @@ async def test_import_preview_without_confirm(
     # Re-read counts by running queries (sync helper inside an async
     # test is awkward — inline the queries).
     exam_count_before = (
-        await db_session.execute(
-            select(func.count()).select_from(Exam)
-        )
+        await db_session.execute(select(func.count()).select_from(Exam))
     ).scalar_one()
     question_count_before = (
-        await db_session.execute(
-            select(func.count()).select_from(Question)
-        )
+        await db_session.execute(select(func.count()).select_from(Question))
     ).scalar_one()
     answer_count_before = (
-        await db_session.execute(
-            select(func.count()).select_from(Answer)
-        )
+        await db_session.execute(select(func.count()).select_from(Answer))
     ).scalar_one()
 
     # Preview an envelope that would CREATE 1 new question and DELETE
@@ -387,19 +378,13 @@ async def test_import_preview_without_confirm(
 
     # DB row counts unchanged.
     exam_count_after = (
-        await db_session.execute(
-            select(func.count()).select_from(Exam)
-        )
+        await db_session.execute(select(func.count()).select_from(Exam))
     ).scalar_one()
     question_count_after = (
-        await db_session.execute(
-            select(func.count()).select_from(Question)
-        )
+        await db_session.execute(select(func.count()).select_from(Question))
     ).scalar_one()
     answer_count_after = (
-        await db_session.execute(
-            select(func.count()).select_from(Answer)
-        )
+        await db_session.execute(select(func.count()).select_from(Answer))
     ).scalar_one()
     assert exam_count_after == exam_count_before
     assert question_count_after == question_count_before
@@ -447,9 +432,7 @@ async def test_import_apply_with_confirm_true(
         await db_session.execute(select(func.count()).select_from(Exam))
     ).scalar_one()
     question_count = (
-        await db_session.execute(
-            select(func.count()).select_from(Question)
-        )
+        await db_session.execute(select(func.count()).select_from(Question))
     ).scalar_one()
     assert exam_count == 1
     assert question_count == 2
@@ -655,10 +638,7 @@ async def test_e2e_export_then_import_same_file_yields_zero_changes(
     # Spot-check: the question's text and the uuids are preserved.
     assert second_envelope["questions"][0]["uuid"] == captured_question_uuid
     assert second_envelope["questions"][0]["question_text"] == captured_question_text
-    assert (
-        second_envelope["questions"][0]["exam_context"]["uuid"]
-        == captured_exam_uuid
-    )
+    assert second_envelope["questions"][0]["exam_context"]["uuid"] == captured_exam_uuid
 
 
 @pytest.mark.asyncio

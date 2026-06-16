@@ -19,9 +19,7 @@ from sqlalchemy import create_engine, text
 
 from app.db.base import Base
 
-UUID4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-)
+UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 TABLES = ("exams", "questions", "answers")
 TABLES_WITH_COUNTS = [("exams", 3), ("questions", 5), ("answers", 4)]
 
@@ -37,6 +35,7 @@ def seeded_db(tmp_path: Path) -> Path:
     from app.models.practice_response import PracticeResponse  # noqa: F401
     from app.models.practice_session import PracticeSession  # noqa: F401
     from app.models.question import Question  # noqa: F401
+
     Base.metadata.create_all(engine)
     # Mirror 002's net effect: drop the difficulty column. SQLite needs
     # a table rebuild to drop a column referenced by a check constraint.
@@ -129,25 +128,31 @@ def seeded_db(tmp_path: Path) -> Path:
     with engine.begin() as conn:
         for p in (1, 2, 3):
             conn.execute(
-                text("INSERT INTO exams (partial_number, exam_date, topic_tags, "
-                     "created_at, updated_at) VALUES (:p, NULL, NULL, :ts, :ts)"),
+                text(
+                    "INSERT INTO exams (partial_number, exam_date, topic_tags, "
+                    "created_at, updated_at) VALUES (:p, NULL, NULL, :ts, :ts)"
+                ),
                 {"p": p, "ts": "2026-06-03 00:00:00"},
             )
         for i in range(1, 6):
             conn.execute(
-                text("INSERT INTO questions (exam_id, image_id, question_text, "
-                     "extracted_text, confidence_score, topic, order_in_exam, "
-                     "is_corrected, correction_notes, has_code_in_answers, "
-                     "created_at, updated_at) "
-                     "VALUES (1, NULL, :t, NULL, NULL, 'OTHER', :o, 0, NULL, 0, :ts, :ts)"),
+                text(
+                    "INSERT INTO questions (exam_id, image_id, question_text, "
+                    "extracted_text, confidence_score, topic, order_in_exam, "
+                    "is_corrected, correction_notes, has_code_in_answers, "
+                    "created_at, updated_at) "
+                    "VALUES (1, NULL, :t, NULL, NULL, 'OTHER', :o, 0, NULL, 0, :ts, :ts)"
+                ),
                 {"t": f"Q{i}", "o": i, "ts": "2026-06-03 00:00:00"},
             )
         for q_id, ans in [(1, "A"), (2, "B"), (3, "C"), (4, "D")]:
             conn.execute(
-                text("INSERT INTO answers (question_id, answer_text, answer_type, "
-                     "is_common_misconception, explanation, display_order, "
-                     "created_at, updated_at) "
-                     "VALUES (:q, :a, 'correct', 0, NULL, 0, :ts, :ts)"),
+                text(
+                    "INSERT INTO answers (question_id, answer_text, answer_type, "
+                    "is_common_misconception, explanation, display_order, "
+                    "created_at, updated_at) "
+                    "VALUES (:q, :a, 'correct', 0, NULL, 0, :ts, :ts)"
+                ),
                 {"q": q_id, "a": ans, "ts": "2026-06-03 00:00:00"},
             )
     engine.dispose()
@@ -157,8 +162,14 @@ def seeded_db(tmp_path: Path) -> Path:
 def _load_migration_module():
     """Load 003_add_uuid_columns.py by file path so the local alembic/
     source directory cannot shadow the installed alembic package."""
-    path = (Path(__file__).resolve().parent.parent.parent
-            / "app" / "db" / "migrations" / "versions" / "003_add_uuid_columns.py")
+    path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "app"
+        / "db"
+        / "migrations"
+        / "versions"
+        / "003_add_uuid_columns.py"
+    )
     spec = importlib.util.spec_from_file_location("migration_003_under_test", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -179,12 +190,16 @@ def _run_migration(module, fn_name: str, db_path: Path) -> None:
 def _assert_uuid_state(db_path: Path, table: str, expected_count: int) -> None:
     conn = sqlite3.connect(str(db_path))
     try:
-        assert conn.execute(
-            f"SELECT COUNT(*) FROM {table} WHERE uuid IS NULL"
-        ).fetchone()[0] == 0
-        assert conn.execute(
-            f"SELECT COUNT(*) FROM {table}"
-        ).fetchone()[0] == expected_count
+        assert (
+            conn.execute(f"SELECT COUNT(*) FROM {table} WHERE uuid IS NULL").fetchone()[
+                0
+            ]
+            == 0
+        )
+        assert (
+            conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            == expected_count
+        )
         uuids = [u for (u,) in conn.execute(f"SELECT uuid FROM {table}").fetchall()]
         assert all(UUID4_RE.match(u) for u in uuids)
         dups = conn.execute(
@@ -225,16 +240,18 @@ def test_migration_downgrade_reverses_cleanly(seeded_db: Path) -> None:
     conn = sqlite3.connect(str(seeded_db))
     try:
         for table, expected in TABLES_WITH_COUNTS:
-            cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+            cols = [
+                r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            ]
             assert "uuid" not in cols
             idx = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='index' "
                 f"AND tbl_name='{table}' AND name='ix_{table}_uuid'"
             ).fetchall()
             assert idx == []
-            assert conn.execute(
-                f"SELECT COUNT(*) FROM {table}"
-            ).fetchone()[0] == expected
+            assert (
+                conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == expected
+            )
     finally:
         conn.close()
 
@@ -248,7 +265,9 @@ def test_backfill_only_fills_null_rows(seeded_db: Path) -> None:
         for table in TABLES:
             conn.execute(text(f"ALTER TABLE {table} ADD COLUMN uuid VARCHAR(36)"))
         conn.execute(
-            text("UPDATE exams SET uuid = '11111111-1111-4111-8111-111111111111' WHERE id = 1")
+            text(
+                "UPDATE exams SET uuid = '11111111-1111-4111-8111-111111111111' WHERE id = 1"
+            )
         )
     engine.dispose()
 
@@ -266,13 +285,17 @@ def test_backfill_only_fills_null_rows(seeded_db: Path) -> None:
     try:
         row = conn.execute("SELECT uuid FROM exams WHERE id = 1").fetchone()
         assert row[0] == "11111111-1111-4111-8111-111111111111"
-        others = [u for (u,) in conn.execute(
-            "SELECT uuid FROM exams WHERE id != 1"
-        ).fetchall()]
+        others = [
+            u
+            for (u,) in conn.execute("SELECT uuid FROM exams WHERE id != 1").fetchall()
+        ]
         assert all(UUID4_RE.match(u) for u in others)
         for table in TABLES:
-            assert conn.execute(
-                f"SELECT COUNT(*) FROM {table} WHERE uuid IS NULL"
-            ).fetchone()[0] == 0
+            assert (
+                conn.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE uuid IS NULL"
+                ).fetchone()[0]
+                == 0
+            )
     finally:
         conn.close()

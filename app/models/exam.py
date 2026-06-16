@@ -4,13 +4,12 @@ import uuid as _uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text
+from sqlalchemy import CheckConstraint, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.models.answer import Answer
     from app.models.exam_image import ExamImage
     from app.models.practice_session import PracticeSession
     from app.models.question import Question

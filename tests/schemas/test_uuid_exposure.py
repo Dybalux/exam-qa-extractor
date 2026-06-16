@@ -83,7 +83,9 @@ def test_uuid_round_trips_via_model_dump_json() -> None:
     """JSON serialization must include uuid at every level."""
     exam_json = ExamResponse.model_validate(_exam_obj()).model_dump(mode="json")
     assert exam_json["uuid"] == "exam-uuid-1"
-    question_json = QuestionResponse.model_validate(_question_obj()).model_dump(mode="json")
+    question_json = QuestionResponse.model_validate(_question_obj()).model_dump(
+        mode="json"
+    )
     assert question_json["uuid"] == "question-uuid-1"
     answer_json = AnswerResponse.model_validate(_answer_obj()).model_dump(mode="json")
     assert answer_json["uuid"] == "answer-uuid-1"

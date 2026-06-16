@@ -278,6 +278,7 @@ def test_malformed_import_error_carries_validation_errors_in_details() -> None:
     # It must be a subclass of the base ``ExamStudyError`` so existing
     # exception handlers (mapped to 500) still work as a fallback.
     from app.core.exceptions import ExamStudyError
+
     assert isinstance(err, ExamStudyError)
 
 
@@ -285,6 +286,7 @@ def test_unknown_schema_version_inherits_from_base() -> None:
     """``UnknownSchemaVersion`` must extend ``ExamStudyError``."""
     err = UnknownSchemaVersion("Unknown schema version: 0.9")
     from app.core.exceptions import ExamStudyError
+
     assert isinstance(err, ExamStudyError)
     assert "0.9" in err.message
 
@@ -293,6 +295,7 @@ def test_payload_too_large_error_inherits_from_base() -> None:
     """``PayloadTooLargeError`` must extend ``ExamStudyError``."""
     err = PayloadTooLargeError("File exceeds 10 MB")
     from app.core.exceptions import ExamStudyError
+
     assert isinstance(err, ExamStudyError)
     assert "10 MB" in err.message
 
@@ -305,5 +308,6 @@ def test_payload_too_large_error_inherits_from_base() -> None:
 def test_settings_max_import_size_mb_default_is_10() -> None:
     """``Settings.max_import_size_mb`` must default to 10."""
     from app.config import Settings
+
     s = Settings()
     assert s.max_import_size_mb == 10

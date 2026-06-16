@@ -142,11 +142,11 @@ class PracticeService:
 
         now = datetime.now(timezone.utc)
         practice_session.completed_at = now
-        
+
         started_at = practice_session.started_at
         if started_at.tzinfo is None:
             started_at = started_at.replace(tzinfo=timezone.utc)
-            
+
         elapsed = now - started_at
         practice_session.total_time_seconds = int(elapsed.total_seconds())
 

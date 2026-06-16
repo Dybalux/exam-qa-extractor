@@ -86,7 +86,9 @@ async def update_question(
     service: QuestionService = Depends(get_question_service),
 ) -> QuestionResponse:
     """Update question fields."""
-    q = await service.update_question(question_id=question_id, **payload.model_dump(exclude_none=True))
+    q = await service.update_question(
+        question_id=question_id, **payload.model_dump(exclude_none=True)
+    )
     return QuestionResponse.model_validate(q)
 
 

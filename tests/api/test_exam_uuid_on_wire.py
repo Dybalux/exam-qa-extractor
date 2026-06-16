@@ -20,7 +20,6 @@ import re
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Importing the models is required so they register with `app.db.base.Base`
 # before the `db_engine` fixture (in tests/conftest.py) calls
@@ -44,9 +43,7 @@ def _assert_is_uuid4(value: object, context: str) -> str:
     assert isinstance(value, str), (
         f"{context}: uuid must be a string, got {type(value).__name__}"
     )
-    assert _UUID4_RE.match(value), (
-        f"{context}: uuid is not a valid v4 UUID: {value!r}"
-    )
+    assert _UUID4_RE.match(value), f"{context}: uuid is not a valid v4 UUID: {value!r}"
     return value
 
 
@@ -88,9 +85,7 @@ async def test_get_exam_response_includes_same_uuid_on_wire(
     assert create_resp.status_code == 201, create_resp.text
     created = create_resp.json()
     exam_id = created["id"]
-    created_uuid = _assert_is_uuid4(
-        created["uuid"], "POST response uuid"
-    )
+    created_uuid = _assert_is_uuid4(created["uuid"], "POST response uuid")
 
     get_resp = await client.get(f"/api/v1/exams/{exam_id}")
     assert get_resp.status_code == 200, get_resp.text
@@ -136,6 +131,4 @@ async def test_list_exams_includes_uuid_per_item_on_wire(
         uuids.append(_assert_is_uuid4(item["uuid"], f"list item #{idx}"))
 
     # No two exams should share a uuid (the whole point of the column).
-    assert len(set(uuids)) == len(uuids), (
-        f"Duplicate uuids in list response: {uuids}"
-    )
+    assert len(set(uuids)) == len(uuids), f"Duplicate uuids in list response: {uuids}"

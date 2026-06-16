@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Tests for :class:`JsonIOService.export_full_db`.
 
 The export path is a pure read: it must return a valid envelope with
@@ -13,6 +14,7 @@ transactional session, so any extra query is observable through the
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +29,6 @@ from app.schemas.json_io import (
     QuestionExportSchema,
 )
 from app.services.json_io_service import JsonIOService
-
 
 _UUID4_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -123,7 +124,10 @@ async def test_export_populated_db_round_trips_through_schema(
                 exam,
                 text=f"Q{q_idx} for exam {p}",
                 topic="OTHER",
-                answers=[(f"A{q_idx}{a}", "correct" if a == 0 else "incorrect") for a in range(4)],
+                answers=[
+                    (f"A{q_idx}{a}", "correct" if a == 0 else "incorrect")
+                    for a in range(4)
+                ],
             )
     await db_session.commit()
 
@@ -232,8 +236,7 @@ async def test_export_uses_dedicated_logger_name(
         if record.name == "app.services.json_io_service"
     ]
     assert matching, (
-        "Expected at least one log record on logger "
-        "'app.services.json_io_service'"
+        "Expected at least one log record on logger 'app.services.json_io_service'"
     )
 
 
@@ -244,13 +247,7 @@ async def test_export_uses_dedicated_logger_name(
 import pytest
 
 from app.core.exceptions import MalformedImportError, UnknownSchemaVersion
-from app.schemas.json_io import (
-    AnswerExportSchema,
-    ExamContextExportSchema,
-    ExportFileSchema,
-    QuestionExportSchema,
-)
-from app.services.json_io_service import JsonIOService, PREVIEW_ENTRY_CAP
+from app.services.json_io_service import PREVIEW_ENTRY_CAP
 
 
 def _envelope_dict(
@@ -319,14 +316,19 @@ def _answer_dict(
 async def test_preview_no_db_writes(db_session: AsyncSession) -> None:
     """``preview_import`` must NOT add, update, or delete any rows."""
     # Seed an exam and a question so the DB is not empty.
-    exam = Exam(partial_number=1, exam_date=__import__("datetime").date(2024, 6, 15), topic_tags="a")
+    exam = Exam(
+        partial_number=1,
+        exam_date=__import__("datetime").date(2024, 6, 15),
+        topic_tags="a",
+    )
     db_session.add(exam)
     await db_session.flush()
     q = Question(exam_id=exam.id, question_text="Seed", is_corrected=False)
     db_session.add(q)
     await db_session.commit()
 
-    from sqlalchemy import func, select as _select
+    from sqlalchemy import func
+    from sqlalchemy import select as _select
 
     # Capture counts before the preview.
     exam_count_before = (
@@ -470,13 +472,26 @@ async def test_preview_collects_all_validation_errors(
     await db_session.commit()
     exam_uuid = exam.uuid
 
-    bad1 = _question_dict(uuid="11111111-1111-4111-8111-111111111111", exam_uuid=exam_uuid)
+    bad1 = _question_dict(
+        uuid="11111111-1111-4111-8111-111111111111", exam_uuid=exam_uuid
+    )
     bad1["exam_context"]["partial_number"] = "not an int"  # strict → fail
-    bad2 = _question_dict(uuid="22222222-2222-4222-8222-222222222222", exam_uuid=exam_uuid)
-    bad2["answers"] = [{"uuid": "x", "answer_text": "", "answer_type": "correct",
-                         "is_common_misconception": False, "explanation": None,
-                         "display_order": 0}]  # min_length=1 → fail
-    bad3 = _question_dict(uuid="33333333-3333-4333-8333-333333333333", exam_uuid=exam_uuid)
+    bad2 = _question_dict(
+        uuid="22222222-2222-4222-8222-222222222222", exam_uuid=exam_uuid
+    )
+    bad2["answers"] = [
+        {
+            "uuid": "x",
+            "answer_text": "",
+            "answer_type": "correct",
+            "is_common_misconception": False,
+            "explanation": None,
+            "display_order": 0,
+        }
+    ]  # min_length=1 → fail
+    bad3 = _question_dict(
+        uuid="33333333-3333-4333-8333-333333333333", exam_uuid=exam_uuid
+    )
     bad3["question_text"] = ""  # min_length=1 → fail
 
     payload = _envelope_dict([bad1, bad2, bad3])
@@ -565,7 +580,8 @@ async def test_preview_caps_preview_list_at_50_entries(
 
 import datetime as _dt
 
-from sqlalchemy import func, select as _select
+from sqlalchemy import func
+from sqlalchemy import select as _select
 from sqlalchemy.exc import IntegrityError
 
 from app.schemas.json_io import ImportApplyResultSchema
@@ -658,9 +674,7 @@ async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
         updated: 3 questions (q1..q3) + 3 answers + 1 exam.
         deleted: 1 question (q4) + 1 answer (a4).
     """
-    exam = await _seed_exam(
-        db_session, partial_number=1, tags="original-tags"
-    )
+    exam = await _seed_exam(db_session, partial_number=1, tags="original-tags")
     q1 = await _seed_question(
         db_session, exam, text="old Q1", answers=[("old A1", "correct")]
     )
@@ -670,23 +684,17 @@ async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
     q3 = await _seed_question(
         db_session, exam, text="old Q3", answers=[("old A3", "correct")]
     )
-    q4 = await _seed_question(
+    await _seed_question(
         db_session, exam, text="orphan Q4", answers=[("orphan A4", "correct")]
     )
     a1 = (
-        await db_session.execute(
-            _select(Answer).where(Answer.question_id == q1.id)
-        )
+        await db_session.execute(_select(Answer).where(Answer.question_id == q1.id))
     ).scalar_one()
     a2 = (
-        await db_session.execute(
-            _select(Answer).where(Answer.question_id == q2.id)
-        )
+        await db_session.execute(_select(Answer).where(Answer.question_id == q2.id))
     ).scalar_one()
     a3 = (
-        await db_session.execute(
-            _select(Answer).where(Answer.question_id == q3.id)
-        )
+        await db_session.execute(_select(Answer).where(Answer.question_id == q3.id))
     ).scalar_one()
     await db_session.commit()
 
@@ -708,11 +716,7 @@ async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
             exam_uuid=exam_uuid,
             text="updated Q1",
             is_corrected=True,
-            answers=[
-                _answer_dict(
-                    uuid=a1.uuid, text="updated A1", atype="incorrect"
-                )
-            ],
+            answers=[_answer_dict(uuid=a1.uuid, text="updated A1", atype="incorrect")],
         )
     )
     json_questions.append(
@@ -721,11 +725,7 @@ async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
             exam_uuid=exam_uuid,
             text="updated Q2",
             is_corrected=True,
-            answers=[
-                _answer_dict(
-                    uuid=a2.uuid, text="updated A2", atype="incorrect"
-                )
-            ],
+            answers=[_answer_dict(uuid=a2.uuid, text="updated A2", atype="incorrect")],
         )
     )
     json_questions.append(
@@ -734,11 +734,7 @@ async def test_apply_mixed_counts(db_session: AsyncSession) -> None:
             exam_uuid=exam_uuid,
             text="updated Q3",
             is_corrected=True,
-            answers=[
-                _answer_dict(
-                    uuid=a3.uuid, text="updated A3", atype="incorrect"
-                )
-            ],
+            answers=[_answer_dict(uuid=a3.uuid, text="updated A3", atype="incorrect")],
         )
     )
     # q4 is intentionally omitted (orphan)
@@ -1043,7 +1039,6 @@ async def test_apply_opens_exactly_one_transaction(
 
 from datetime import date as _date_mod
 
-
 # Canonical baseline values used by every parameter case. Keeping them
 # here (not in the fixture) makes it obvious that every case is a delta
 # of exactly one field from this baseline.
@@ -1185,9 +1180,7 @@ async def _seed_baseline_question(
         question_id=q.id,
         answer_text=_BASELINE_QUESTION["answer_text"],
         answer_type=_BASELINE_QUESTION["answer_type"],
-        is_common_misconception=_BASELINE_QUESTION[
-            "answer_is_common_misconception"
-        ],
+        is_common_misconception=_BASELINE_QUESTION["answer_is_common_misconception"],
         explanation=_BASELINE_QUESTION["answer_explanation"],
         display_order=_BASELINE_QUESTION["answer_display_order"],
     )

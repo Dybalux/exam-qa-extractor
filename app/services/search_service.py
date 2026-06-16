@@ -140,7 +140,9 @@ class SearchService:
         if topic is not None:
             stmt = stmt.where(Question.topic == topic)
 
-        stmt = stmt.order_by(Question.exam_id.asc(), Question.order_in_exam.asc().nullslast())
+        stmt = stmt.order_by(
+            Question.exam_id.asc(), Question.order_in_exam.asc().nullslast()
+        )
 
         result = await self.session.execute(stmt)
         all_questions = result.scalars().all()
@@ -148,9 +150,7 @@ class SearchService:
         # Filter in Python — requires selectin-loaded answers
         without_answers = [q for q in all_questions if not q.is_ready_for_practice]
 
-        logger.info(
-            f"Found {len(without_answers)} questions without correct answers"
-        )
+        logger.info(f"Found {len(without_answers)} questions without correct answers")
         return without_answers
 
     async def search_by_topic(
@@ -172,9 +172,7 @@ class SearchService:
         """
         valid_topics = {t.value for t in TopicEnum}
         if topic not in valid_topics:
-            raise ValueError(
-                f"Invalid topic: {topic}. Valid: {sorted(valid_topics)}"
-            )
+            raise ValueError(f"Invalid topic: {topic}. Valid: {sorted(valid_topics)}")
 
         result = await self.session.execute(
             select(Question)
@@ -213,9 +211,7 @@ class SearchService:
         if exam_id is not None:
             stmt = stmt.where(Question.exam_id == exam_id)
 
-        stmt = stmt.order_by(
-            Question.confidence_score.asc().nullsfirst()
-        ).limit(limit)
+        stmt = stmt.order_by(Question.confidence_score.asc().nullsfirst()).limit(limit)
 
         result = await self.session.execute(stmt)
         return result.scalars().all()

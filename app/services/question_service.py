@@ -87,7 +87,9 @@ class QuestionService:
         await self.session.commit()
         await self.session.refresh(question)
 
-        logger.info(f"Created question {question.id} for exam {exam_id} (topic={topic})")
+        logger.info(
+            f"Created question {question.id} for exam {exam_id} (topic={topic})"
+        )
         return question
 
     async def get_question(self, question_id: int) -> Question:
@@ -141,7 +143,9 @@ class QuestionService:
         if is_corrected is not None:
             query = query.where(Question.is_corrected == is_corrected)
 
-        query = query.order_by(Question.order_in_exam.asc().nullslast(), Question.id.asc())
+        query = query.order_by(
+            Question.order_in_exam.asc().nullslast(), Question.id.asc()
+        )
 
         result = await self.session.execute(query)
         questions = list(result.scalars().all())
