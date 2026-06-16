@@ -18,44 +18,22 @@ Notes on isolation:
 
 from __future__ import annotations
 
-import importlib
+
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-# The project ships an `alembic/` source directory that shadows the
-# installed `alembic` package. Both the bare project root and the
-# empty-string `""` (cwd) entry on sys.path resolve to it. Remove any
-# sys.path entry that resolves to the project root, then promote the
-# installed alembic parent to the front.
+# The `alembic/` directory that previously lived at the project root
+# has been moved to `app/db/migrations/` (refactor/move-alembic-into-app).
+# The shadow-conflict with the installed `alembic` package is now gone;
+# no sys.path surgery is needed. We only ensure the project root is on
+# sys.path so that `import app` resolves correctly.
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
-sys.path[:] = [
-    p
-    for p in sys.path
-    if p
-    and not (p == _PROJECT_ROOT or str(Path(p).resolve()) == _PROJECT_ROOT)
-]
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-# Now find the real alembic package and prepend its parent.
-for _entry in sys.path:
-    if not _entry:
-        continue
-    _candidate = Path(_entry) / "alembic" / "__init__.py"
-    if _candidate.is_file() and str(Path(_entry).resolve()) != _PROJECT_ROOT:
-        # Promote to front of path.
-        if _entry in sys.path:
-            sys.path.remove(_entry)
-        sys.path.insert(0, _entry)
-        break
+import alembic  # noqa: E402  (imported early to verify no shadow conflict)
 
-# Drop any cached `alembic` modules.
-for _name in [n for n in list(sys.modules) if n == "alembic" or n.startswith("alembic.")]:
-    sys.modules.pop(_name, None)
-importlib.invalidate_caches()
-
-# Pre-load alembic from the installed package so the conftest guarantees
-# it's cached under the correct path before any test module imports.
-import alembic  # noqa: E402  (intentional late import after path fix)
 
 import pytest
 import pytest_asyncio

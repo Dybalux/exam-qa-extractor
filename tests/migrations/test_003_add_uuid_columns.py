@@ -158,7 +158,7 @@ def _load_migration_module():
     """Load 003_add_uuid_columns.py by file path so the local alembic/
     source directory cannot shadow the installed alembic package."""
     path = (Path(__file__).resolve().parent.parent.parent
-            / "alembic" / "versions" / "003_add_uuid_columns.py")
+            / "app" / "db" / "migrations" / "versions" / "003_add_uuid_columns.py")
     spec = importlib.util.spec_from_file_location("migration_003_under_test", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

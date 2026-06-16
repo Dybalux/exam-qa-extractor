@@ -129,7 +129,7 @@ The container runs `alembic upgrade head` automatically on first start and on ev
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
-Edits to files under `app/` or `alembic/` trigger an automatic reload.
+Edits to files under `app/` trigger an automatic reload.
 
 ### Where data lives
 - SQLite database: `./data/db/database.db`
@@ -192,7 +192,7 @@ cp .env.example .env
 
 5. Initialize database:
 ```bash
-alembic upgrade head
+alembic -c app/alembic.ini upgrade head
 ```
 
 6. Run the application:
@@ -230,11 +230,12 @@ image_to_text/
 │   ├── api/            # API routes and schemas (incl. import_export.py)
 │   ├── core/           # Exceptions, constants, config
 │   ├── db/             # Database configuration
+│   │   ├── migrations/ # Database migrations (Alembic)
+│   │   └── ...
 │   ├── models/         # SQLAlchemy models
 │   ├── services/       # Business logic (incl. json_io_service.py)
 │   ├── templates/      # Jinja2 templates
 │   └── static/         # CSS, JS, images
-├── alembic/            # Database migrations
 ├── tests/              # Test suite
 ├── uploads/            # File uploads (created at runtime)
 └── pyproject.toml      # Project metadata and dependencies

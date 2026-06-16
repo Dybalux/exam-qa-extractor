@@ -129,7 +129,7 @@ El contenedor ejecuta `alembic upgrade head` automáticamente en el primer arran
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
-Las ediciones en archivos bajo `app/` o `alembic/` disparan una recarga automática.
+Las ediciones en archivos bajo `app/` disparan una recarga automática.
 
 ### Dónde se guardan los datos
 - Base de datos SQLite: `./data/db/database.db`
@@ -192,7 +192,7 @@ cp .env.example .env
 
 5. Inicializá la base de datos:
 ```bash
-alembic upgrade head
+alembic -c app/alembic.ini upgrade head
 ```
 
 6. Ejecutá la aplicación:
@@ -230,11 +230,12 @@ image_to_text/
 │   ├── api/            # Rutas de API y schemas (incl. import_export.py)
 │   ├── core/           # Excepciones, constantes, config
 │   ├── db/             # Configuración de base de datos
+│   │   ├── migrations/ # Migraciones de base de datos (Alembic)
+│   │   └── ...
 │   ├── models/         # Modelos SQLAlchemy
 │   ├── services/       # Lógica de negocio (incl. json_io_service.py)
 │   ├── templates/      # Templates Jinja2
 │   └── static/         # CSS, JS, imágenes
-├── alembic/            # Migraciones de base de datos
 ├── tests/              # Suite de tests
 ├── uploads/            # Subidas de archivos (creado en runtime)
 └── pyproject.toml      # Metadatos del proyecto y dependencias

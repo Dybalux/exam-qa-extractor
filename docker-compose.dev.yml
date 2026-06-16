@@ -3,7 +3,6 @@ services:
     image: exam-qa-extractor:dev
     volumes:
       - ./app:/app/app
-      - ./alembic:/app/alembic
     environment: { DEBUG: "true" }
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000",
-              --reload, --reload-dir, /app/app, --reload-dir, /app/alembic]
+              --reload, --reload-dir, /app/app]
