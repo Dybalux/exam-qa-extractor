@@ -70,3 +70,6 @@ alembic.ini.local
 # Misc
 *.bak
 *.tmp
+
+# Local-only compose overrides
+docker-compose.observability.yml
