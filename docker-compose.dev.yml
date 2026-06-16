@@ -9,8 +9,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./app:/app/app              # bind-mount → hot reload
-      - ./alembic:/app/alembic      # bind-mount → migration changes live too
+      - ./app:/app/app              # bind-mount → hot reload (includes db/migrations)
       - app_data:/app/data          # named volume → DB + uploads survive restarts
     environment:
       DEBUG: "true"
@@ -24,8 +23,6 @@ services:
       - --reload
       - --reload-dir
       - /app/app
-      - --reload-dir
-      - /app/alembic
 
 volumes:
   app_data:

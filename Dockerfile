@@ -18,8 +18,6 @@ RUN groupadd --gid 1000 app && useradd --uid 1000 --gid 1000 \
 
 # Stage 4: app code + migrations
 COPY --chown=app:app docker/entrypoint.sh /app/docker/entrypoint.sh
-COPY --chown=app:app alembic/        /app/alembic/
-COPY --chown=app:app alembic.ini     /app/alembic.ini
 COPY --chown=app:app app/            /app/app/
 RUN chmod +x /app/docker/entrypoint.sh
 

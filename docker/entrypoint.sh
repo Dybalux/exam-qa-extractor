@@ -4,6 +4,11 @@ DB_DIR="/app/data/db"
 DB_FILE="${DB_DIR}/database.db"
 mkdir -p "${DB_DIR}"
 
+# alembic.ini now lives inside app/ (moved by refactor/move-alembic-into-app).
+# Run all alembic commands from /app so the `prepend_sys_path = ..` in
+# app/alembic.ini resolves to /app (the repo root inside the container).
+ALEMBIC="alembic -c /app/app/alembic.ini"
+
 table_exists() {
   python - <<'PY'
 import sqlite3, sys
@@ -16,14 +21,14 @@ PY
 
 if [ ! -f "${DB_FILE}" ]; then
   echo "[entrypoint] No DB — fresh migrations."
-  alembic upgrade head
+  ${ALEMBIC} upgrade head
 elif table_exists; then
   echo "[entrypoint] Managed DB — applying pending."
-  alembic upgrade head
+  ${ALEMBIC} upgrade head
 else
   echo "[entrypoint] Unmanaged DB — stamping then migrating."
-  alembic stamp head
-  alembic upgrade head
+  ${ALEMBIC} stamp head
+  ${ALEMBIC} upgrade head
 fi
 
 echo "[entrypoint] Launching: $*"
