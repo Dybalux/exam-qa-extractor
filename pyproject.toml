@@ -6,64 +6,60 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     # Web framework
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    
+    "fastapi>=0.104.0,<1.0",
+    "uvicorn[standard]>=0.24.0,<1.0",
+
     # Database
-    "sqlalchemy>=2.0.0",
-    "alembic>=1.12.0",
-    "aiosqlite>=0.19.0",
-    
+    "sqlalchemy>=2.0.0,<3.0",
+    "alembic>=1.12.0,<2.0",
+    "aiosqlite>=0.19.0,<1.0",
+
     # Validation & settings
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
-    
+    "pydantic>=2.5.0,<3.0",
+    "pydantic-settings>=2.1.0,<3.0",
+
     # OCR and image processing
-    "pytesseract>=0.3.10",
-    "pillow>=10.1.0",
-    "opencv-python-headless>=4.8.0",
-    "numpy>=1.26.0",
-    "pymupdf>=1.23.0",  # PDF handling
-    "openai>=1.0.0",
-    
+    "pytesseract>=0.3.10,<1.0",
+    "pillow>=10.1.0,<12.0",
+    "opencv-python-headless>=4.8.0,<5.0",
+    "numpy>=1.26.0,<3.0",
+    "pymupdf>=1.23.0,<2.0",  # PDF handling
+    "openai>=1.0.0,<2.0",
+
     # File handling
-    "python-multipart>=0.0.6",
-    "python-magic>=0.4.27",
-    
+    "python-multipart>=0.0.6,<1.0",
+    "python-magic>=0.4.27,<1.0",
+
     # Templates
-    "jinja2>=3.1.2",
-    
+    "jinja2>=3.1.2,<4.0",
+
     # Environment
-    "python-dotenv>=1.0.0",
-    
+    "python-dotenv>=1.0.0,<2.0",
+
     # Logging
-    "structlog>=23.2.0",
+    "structlog>=23.2.0,<26.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     # Testing
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "httpx>=0.25.0",
-    "factory-boy>=3.3.0",
-    "freezegun>=1.2.0",
-    
-    # Code quality
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.7.0",
-    
-    # Type stubs
-    "types-python-magic>=0.4.0",
+    "pytest>=8.0.0,<9.0",
+    "pytest-asyncio>=0.24.0,<1.0",
+    "pytest-cov>=5.0.0,<7.0",
+    "httpx>=0.27.0,<1.0",
+    "factory-boy>=3.3.0,<4.0",
+    "freezegun>=1.5.0,<2.0",
+
+    # Code quality — ruff handles formatting too; black removed
+    "ruff>=0.8.0,<1.0",
+    "mypy>=1.13.0,<2.0",
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["app"]
 
 [tool.pytest.ini_options]
@@ -77,13 +73,10 @@ filterwarnings = [
     "ignore::DeprecationWarning",
 ]
 
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-include = "\\.pyi?$"
-
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -91,9 +84,9 @@ select = [
     "I",  # isort
     "N",  # pep8-naming
 ]
-ignore = ["E501"]  # Line too long (handled by black)
+ignore = ["E501"]  # line length handled by ruff format
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.mypy]
