@@ -88,13 +88,13 @@ async def export_full_db(
     )
 
 
-@router.post("/import", status_code=200)
+@router.post("/import", status_code=200, response_model=None)
 async def import_envelope(
     response: Response,
     file: UploadFile = File(...),
     confirm: bool = Query(default=False),
     svc: JsonIOService = Depends(get_json_io_service),
-) -> ImportPreviewSchema | ImportApplyResultSchema:
+) -> ImportPreviewSchema | ImportApplyResultSchema | Response:
     """Import a JSON envelope (multipart file upload).
 
     This is the **safety boundary** for the entire export/import flow.

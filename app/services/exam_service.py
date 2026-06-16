@@ -255,7 +255,7 @@ class ExamService:
         total_questions = len(questions)
 
         # Count by topic
-        topic_counts = {}
+        topic_counts: dict[str, int] = {}
         for q in questions:
             topic = q.topic
             topic_counts[topic] = topic_counts.get(topic, 0) + 1
