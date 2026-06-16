@@ -1,13 +1,15 @@
 """Exam API routes."""
 
 import logging
-from pathlib import Path
-from typing import BinaryIO
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import RedirectResponse
 
-from app.core.exceptions import FileValidationError, NotFoundError, OCRProcessingError, StorageError
+from app.core.exceptions import (
+    FileValidationError,
+    NotFoundError,
+    StorageError,
+)
 from app.dependencies import (
     get_exam_service,
     get_ocr_service,
@@ -127,56 +129,49 @@ async def upload_exam_image(
     q_svc: QuestionService = Depends(get_question_service),
 ) -> RedirectResponse:
     """Upload and process exam image with OCR.
-    
+
     Saves the image, runs OCR, and creates questions from extracted text.
     Redirects to review queue or exam detail with flash message.
     """
     # Verify exam exists
     try:
-        exam = await exam_svc.get_exam(exam_id)
+        await exam_svc.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    
+
     # Validate file was provided
     if not file.filename:
         return RedirectResponse(
             url=f"/exams/{exam_id}/upload?message=No+se+proporcionó+archivo&type=error",
-            status_code=303
+            status_code=303,
         )
-    
+
     try:
-        # Read file data into BytesIO stream
-        import io
-        file_bytes = await file.read()
-        file_stream = io.BytesIO(file_bytes)
-        
-        # Save file using storage service
+        # Save file first
         upload_result = await storage_svc.save_file(
-            file_data=file_stream,
+            file_data=await file.read(),
             original_filename=file.filename,
             exam_id=exam_id,
         )
-        
-        logger.info(f"File saved: {upload_result.storage_path}")
-        
-        # Run OCR on the saved file
+
         try:
-            ocr_result = await ocr_svc.extract_from_path(upload_result.storage_path)
-        except OCRProcessingError as ocr_err:
+            # Process OCR
+            ocr_result = await ocr_svc.process_image(upload_result.absolute_path)
+        except Exception as ocr_err:
             # OCR failed but file was saved - redirect with warning
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")
             return RedirectResponse(
                 url=f"/exams/{exam_id}?message=Archivo+guardado+pero+OCR+falló:+{str(ocr_err)}&type=warning",
-                status_code=303
+                status_code=303,
             )
-        
+
         # Create questions from OCR results
         questions_created = 0
         questions_needing_review = 0
-        
+
         for extracted_q in ocr_result.questions:
             try:
-                question = await q_svc.create_question(
+                await q_svc.create_question(
                     exam_id=exam_id,
                     question_text=extracted_q.text,
                     topic="other",  # Default topic, user should review
@@ -186,14 +181,14 @@ async def upload_exam_image(
                     confidence_score=extracted_q.confidence,
                 )
                 questions_created += 1
-                
+
                 if extracted_q.requires_review:
                     questions_needing_review += 1
-                    
+
             except Exception as e:
                 logger.error(f"Failed to create question from OCR: {e}")
                 continue
-        
+
         # Build redirect message
         if questions_created > 0:
             if questions_needing_review > 0:
@@ -205,24 +200,24 @@ async def upload_exam_image(
         else:
             message = "No se pudieron extraer preguntas del archivo."
             redirect_url = f"/exams/{exam_id}/upload?message={message.replace(' ', '+')}&type=warning"
-        
+
         return RedirectResponse(url=redirect_url, status_code=303)
-        
+
     except FileValidationError as e:
         logger.warning(f"File validation failed: {e}")
         return RedirectResponse(
             url=f"/exams/{exam_id}/upload?message=Archivo+inválido:+{str(e.message)}&type=error",
-            status_code=303
+            status_code=303,
         )
     except StorageError as e:
         logger.error(f"Storage error: {e}")
         return RedirectResponse(
             url=f"/exams/{exam_id}/upload?message=Error+al+guardar+archivo:+{str(e.message)}&type=error",
-            status_code=303
+            status_code=303,
         )
     except Exception as e:
         logger.error(f"Unexpected error processing upload: {e}")
         return RedirectResponse(
             url=f"/exams/{exam_id}/upload?message=Error+inesperado:+{str(e)}&type=error",
-            status_code=303
+            status_code=303,
         )

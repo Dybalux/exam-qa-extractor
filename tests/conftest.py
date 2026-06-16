@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Shared pytest fixtures for the exam-qa-extractor test suite.
 
 These fixtures are designed to be used across all PRs of the
@@ -18,7 +19,6 @@ Notes on isolation:
 
 from __future__ import annotations
 
-
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -32,10 +32,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-import alembic  # noqa: E402  (imported early to verify no shadow conflict)
 
-
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
@@ -44,6 +41,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+
+from app.db.base import Base
 
 # Importing the models here is required so they register with
 # ``app.db.base.Base`` before the ``db_engine`` fixture calls
@@ -54,10 +53,11 @@ from sqlalchemy.ext.asyncio import (
 # conftest-level import, the ``client`` fixture works for any
 # test that uses it without each test having to remember the
 # import.
-from app.models import Answer  # noqa: F401
-from app.models import Exam  # noqa: F401
-from app.models import Question  # noqa: F401
-from app.db.base import Base
+from app.models import (
+    Answer,  # noqa: F401
+    Exam,  # noqa: F401
+    Question,  # noqa: F401
+)
 
 
 @pytest_asyncio.fixture

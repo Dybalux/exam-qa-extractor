@@ -33,7 +33,9 @@ class AnalyticsService:
         """
         total_exams = await self.session.scalar(select(func.count(Exam.id)))
         total_questions = await self.session.scalar(select(func.count(Question.id)))
-        total_sessions = await self.session.scalar(select(func.count(PracticeSession.id)))
+        total_sessions = await self.session.scalar(
+            select(func.count(PracticeSession.id))
+        )
         completed_sessions = await self.session.scalar(
             select(func.count(PracticeSession.id)).where(
                 PracticeSession.completed_at != None  # noqa: E711
@@ -52,7 +54,9 @@ class AnalyticsService:
             "questions_ready_for_practice": ready_count,
             "questions_corrected": corrected_count,
             "practice_readiness_pct": (
-                round(ready_count / total_questions * 100, 1) if total_questions else 0.0
+                round(ready_count / total_questions * 100, 1)
+                if total_questions
+                else 0.0
             ),
             "total_practice_sessions": total_sessions or 0,
             "completed_practice_sessions": completed_sessions or 0,

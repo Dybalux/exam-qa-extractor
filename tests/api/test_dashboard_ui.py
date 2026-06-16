@@ -8,7 +8,6 @@ fails silently at runtime — this test catches it pre-merge.
 import pytest
 from httpx import AsyncClient
 
-
 REQUIRED_DOM_IDS = [
     "export-btn",
     "import-file-input",

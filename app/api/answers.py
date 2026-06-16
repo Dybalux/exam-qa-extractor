@@ -3,7 +3,12 @@
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_answer_service
-from app.schemas.answer import AnswerCreate, AnswerResponse, AnswerUpdate, ReorderRequest
+from app.schemas.answer import (
+    AnswerCreate,
+    AnswerResponse,
+    AnswerUpdate,
+    ReorderRequest,
+)
 from app.services.answer_service import AnswerService
 
 router = APIRouter()

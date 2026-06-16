@@ -60,9 +60,7 @@ def _backfill_uuid_column(table: str) -> None:
     """
     conn = op.get_bind()
     select_sql = sa.text(f"SELECT id FROM {table} WHERE uuid IS NULL")
-    update_sql = sa.text(
-        f"UPDATE {table} SET uuid = :u WHERE id = :i AND uuid IS NULL"
-    )
+    update_sql = sa.text(f"UPDATE {table} SET uuid = :u WHERE id = :i AND uuid IS NULL")
     rows = conn.execute(select_sql).fetchall()
     for (row_id,) in rows:
         conn.execute(update_sql, {"u": str(uuid.uuid4()), "i": row_id})

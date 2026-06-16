@@ -82,6 +82,7 @@ class Question(Base):
     def correct_answer(self) -> "Answer | None":
         """Get the correct answer for this question."""
         from app.core.constants import AnswerType
+
         for answer in self.answers:
             if answer.answer_type == AnswerType.CORRECT.value:
                 return answer

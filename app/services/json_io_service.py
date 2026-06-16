@@ -38,12 +38,17 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+if TYPE_CHECKING:
+    from app.models.answer import Answer
+    from app.models.exam import Exam
+    from app.models.question import Question
 
 from app.core.exceptions import MalformedImportError, UnknownSchemaVersion
 from app.schemas.json_io import (
@@ -107,8 +112,6 @@ class JsonIOService:
         # Import the model types here (not at module level) so this
         # module does not import the ORM until the service is
         # actually used. Keeps import-time cheap and side-effect free.
-        from app.models.answer import Answer
-        from app.models.exam import Exam
         from app.models.question import Question
 
         # Select all questions in one statement, eagerly loading both
@@ -188,7 +191,8 @@ class JsonIOService:
             image_id=question.image_id,
             confidence_score=question.confidence_score,
             answers=[
-                self._serialize_answer(a) for a in sorted(question.answers, key=lambda a: a.display_order)
+                self._serialize_answer(a)
+                for a in sorted(question.answers, key=lambda a: a.display_order)
             ],
         )
 
@@ -212,9 +216,7 @@ class JsonIOService:
                 f"Supported versions: {sorted(self.SUPPORTED_VERSIONS)}"
             )
 
-    def _parse_questions(
-        self, raw_questions: list[Any]
-    ) -> list[QuestionExportSchema]:
+    def _parse_questions(self, raw_questions: list[Any]) -> list[QuestionExportSchema]:
         """Validate each question entry, collecting every error.
 
         Per decision #113, this method does NOT fail-fast. It tries
@@ -414,8 +416,6 @@ class JsonIOService:
         """
         # Lazy import keeps this module free of ORM imports until
         # the service is actually used.
-        from app.models.exam import Exam
-        from app.models.question import Question
 
         _, parsed_questions = self._parse_envelope(json_data)
 
@@ -437,17 +437,13 @@ class JsonIOService:
                 # New row the JSON introduces
                 to_create += 1
                 if len(preview) < PREVIEW_ENTRY_CAP:
-                    preview.append(
-                        {"action": "create", "uuid": json_q.uuid}
-                    )
+                    preview.append({"action": "create", "uuid": json_q.uuid})
             else:
                 db_q, db_exam = matched
                 if not self._question_matches_db(json_q, db_q, db_exam):
                     to_update += 1
                     if len(preview) < PREVIEW_ENTRY_CAP:
-                        preview.append(
-                            {"action": "update", "uuid": json_q.uuid}
-                        )
+                        preview.append({"action": "update", "uuid": json_q.uuid})
                 # else: identical → no counter incremented
 
         # Orphans: uuids in the DB that the JSON does not carry.
@@ -455,9 +451,7 @@ class JsonIOService:
             if db_uuid not in json_uuids:
                 to_delete += 1
                 if len(preview) < PREVIEW_ENTRY_CAP:
-                    preview.append(
-                        {"action": "delete", "uuid": db_uuid}
-                    )
+                    preview.append({"action": "delete", "uuid": db_uuid})
 
         self._logger.info(
             "preview to_create=%d to_update=%d to_delete=%d",
@@ -479,9 +473,7 @@ class JsonIOService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _answer_matches_db(
-        json_a: AnswerExportSchema, db_a: "Answer"
-    ) -> bool:
+    def _answer_matches_db(json_a: AnswerExportSchema, db_a: "Answer") -> bool:
         """Return True iff the JSON answer matches the DB row's fields.
 
         Only fields present in :class:`AnswerExportSchema` are
@@ -574,9 +566,7 @@ class JsonIOService:
         async with self.session.begin():
             # Step 2: read DB state in O(1) queries.
             db_questions = await self._load_questions_with_relations()
-            db_question_by_uuid: dict[str, Question] = {
-                q.uuid: q for q in db_questions
-            }
+            db_question_by_uuid: dict[str, Question] = {q.uuid: q for q in db_questions}
             db_exam_by_uuid: dict[str, Exam] = {
                 q.exam.uuid: q.exam for q in db_questions
             }
@@ -648,18 +638,14 @@ class JsonIOService:
                 exam = exam_map[json_q.exam_context.uuid]
                 existing = question_map.get(json_q.uuid)
                 if existing is not None:
-                    if not self._question_matches_db(
-                        json_q, existing, existing.exam
-                    ):
+                    if not self._question_matches_db(json_q, existing, existing.exam):
                         existing.question_text = json_q.question_text
                         existing.extracted_text = json_q.extracted_text
                         existing.topic = json_q.topic
                         existing.order_in_exam = json_q.order_in_exam
                         existing.is_corrected = json_q.is_corrected
                         existing.correction_notes = json_q.correction_notes
-                        existing.has_code_in_answers = (
-                            json_q.has_code_in_answers
-                        )
+                        existing.has_code_in_answers = json_q.has_code_in_answers
                         existing.image_id = json_q.image_id
                         existing.confidence_score = json_q.confidence_score
                         updated += 1
@@ -707,9 +693,7 @@ class JsonIOService:
                             question_id=parent_q.id,
                             answer_text=json_a.answer_text,
                             answer_type=json_a.answer_type,
-                            is_common_misconception=(
-                                json_a.is_common_misconception
-                            ),
+                            is_common_misconception=(json_a.is_common_misconception),
                             explanation=json_a.explanation,
                             display_order=json_a.display_order,
                         )

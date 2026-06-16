@@ -22,6 +22,4 @@ api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 # Empty prefix: the export/import endpoints live at /api/v1/{export,import},
 # NOT nested under /exams. The /api/v1 part comes from app/main.py.
-api_router.include_router(
-    import_export.router, prefix="", tags=["import-export"]
-)
+api_router.include_router(import_export.router, prefix="", tags=["import-export"])

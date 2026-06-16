@@ -56,7 +56,9 @@ async def questions_without_answers(
     service: SearchService = Depends(get_search_service),
 ) -> list[QuestionResponse]:
     """Get questions that have no correct answer yet (not ready for practice)."""
-    questions = await service.get_questions_without_answers(exam_id=exam_id, topic=topic)
+    questions = await service.get_questions_without_answers(
+        exam_id=exam_id, topic=topic
+    )
     return [QuestionResponse.model_validate(q) for q in questions]
 
 
@@ -72,7 +74,10 @@ async def questions_by_topic(
         return [QuestionResponse.model_validate(q) for q in questions]
     except ValueError as exc:
         from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
 
 
 @router.get("/low-confidence", response_model=list[QuestionResponse])

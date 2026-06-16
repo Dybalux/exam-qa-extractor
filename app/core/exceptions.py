@@ -64,7 +64,7 @@ class MalformedImportError(ExamStudyError):
     pass
 
 
-class UnknownSchemaVersion(ExamStudyError):
+class UnknownSchemaVersion(ExamStudyError):  # noqa: N818
     """Raised when the import JSON's ``schema_version`` is unsupported.
 
     The service supports a closed set declared on

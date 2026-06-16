@@ -22,7 +22,16 @@ import json
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.exc import IntegrityError
 
@@ -70,16 +79,12 @@ async def export_full_db(
     in memory twice).
     """
     envelope = await svc.export_full_db()
-    body = json.dumps(
-        envelope.model_dump(mode="json"), default=str
-    ).encode("utf-8")
+    body = json.dumps(envelope.model_dump(mode="json"), default=str).encode("utf-8")
     filename = f"exam-backup-{datetime.now().strftime('%Y%m%d')}.json"
     return StreamingResponse(
         iter([body]),
         media_type="application/json",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -155,8 +160,7 @@ async def import_envelope(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=(
-                f"Upload exceeds {settings.max_import_size_mb} MB "
-                f"({file.size} bytes)."
+                f"Upload exceeds {settings.max_import_size_mb} MB ({file.size} bytes)."
             ),
         )
     if len(raw) > max_bytes:
@@ -168,8 +172,7 @@ async def import_envelope(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=(
-                f"Upload exceeds {settings.max_import_size_mb} MB "
-                f"({len(raw)} bytes)."
+                f"Upload exceeds {settings.max_import_size_mb} MB ({len(raw)} bytes)."
             ),
         )
 
@@ -236,9 +239,7 @@ async def import_envelope(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "detail": "Malformed import",
-                "validation_errors": exc.details.get(
-                    "validation_errors", []
-                ),
+                "validation_errors": exc.details.get("validation_errors", []),
             },
         )
     except UnknownSchemaVersion as exc:

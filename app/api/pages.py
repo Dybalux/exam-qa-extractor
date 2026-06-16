@@ -5,7 +5,7 @@ import uuid
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -29,11 +29,7 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
 
-def _ctx(
-    request: Request,
-    flash: dict | None = None,
-    **kwargs: Any
-) -> dict:
+def _ctx(request: Request, flash: dict | None = None, **kwargs: Any) -> dict:
     """Build base template context with optional flash message."""
     context = {"request": request, **kwargs}
     if flash:
@@ -50,7 +46,9 @@ def _get_flash_from_query(request: Request) -> dict | None:
     return None
 
 
-def _redirect_with_flash(url: str, message: str, msg_type: str = "success") -> RedirectResponse:
+def _redirect_with_flash(
+    url: str, message: str, msg_type: str = "success"
+) -> RedirectResponse:
     """Create redirect response with flash message in query params."""
     separator = "&" if "?" in url else "?"
     redirect_url = f"{url}{separator}message={message}&type={msg_type}"
@@ -63,6 +61,7 @@ def _session_id(request: Request) -> str:
 
 
 # ── Dashboard ────────────────────────────────────────────────
+
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(
@@ -87,11 +86,12 @@ async def dashboard(
             progress=progress,
             exams=exams,
             history=history,
-        )
+        ),
     )
 
 
 # ── Exams ────────────────────────────────────────────────────
+
 
 @router.get("/exams", response_class=HTMLResponse)
 async def exam_list(
@@ -105,16 +105,26 @@ async def exam_list(
         request=request,
         name="exams/list.html",
         context=_ctx(
-            request, flash=flash, page_title="Exámenes", exams=exams, selected_partial=partial_number,
-        )
+            request,
+            flash=flash,
+            page_title="Exámenes",
+            exams=exams,
+            selected_partial=partial_number,
+        ),
     )
 
 
 @router.get("/exams/new", response_class=HTMLResponse)
 async def exam_new(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="exams/form.html", context=_ctx(
-        request, page_title="Nuevo examen", exam=None,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="exams/form.html",
+        context=_ctx(
+            request,
+            page_title="Nuevo examen",
+            exam=None,
+        ),
+    )
 
 
 @router.post("/exams/new")
@@ -129,8 +139,11 @@ async def exam_create(
     exam_date = None
     if exam_date_str:
         from datetime import date
+
         exam_date = date.fromisoformat(exam_date_str)
-    exam = await service.create_exam(partial_number=partial_number, exam_date=exam_date, topic_tags=topic_tags)
+    exam = await service.create_exam(
+        partial_number=partial_number, exam_date=exam_date, topic_tags=topic_tags
+    )
     return _redirect_with_flash(f"/exams/{exam.id}", "Examen creado correctamente")
 
 
@@ -153,9 +166,13 @@ async def exam_detail(
         request=request,
         name="exams/detail.html",
         context=_ctx(
-            request, flash=flash, page_title=f"Parcial {exam.partial_number}", exam=exam,
-            questions=questions, coverage=coverage,
-        )
+            request,
+            flash=flash,
+            page_title=f"Parcial {exam.partial_number}",
+            exam=exam,
+            questions=questions,
+            coverage=coverage,
+        ),
     )
 
 
@@ -169,9 +186,15 @@ async def exam_edit(
         exam = await service.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    return templates.TemplateResponse(request=request, name="exams/form.html", context=_ctx(
-        request, page_title="Editar examen", exam=exam,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="exams/form.html",
+        context=_ctx(
+            request,
+            page_title="Editar examen",
+            exam=exam,
+        ),
+    )
 
 
 @router.post("/exams/{exam_id}/edit")
@@ -199,6 +222,7 @@ async def exam_edit_submit(
 
 # ── Questions ────────────────────────────────────────────────
 
+
 @router.get("/questions", response_class=HTMLResponse)
 async def question_list(
     request: Request,
@@ -211,12 +235,18 @@ async def question_list(
 ) -> HTMLResponse:
     exam_id_val = int(exam_id) if exam_id and exam_id.strip() else None
     topic_val = topic if topic and topic.strip() else None
-    is_corrected_val = True if is_corrected == "true" else False if is_corrected == "false" else None
-    is_ready_val = True if is_ready == "true" else False if is_ready == "false" else None
+    is_corrected_val = (
+        True if is_corrected == "true" else False if is_corrected == "false" else None
+    )
+    is_ready_val = (
+        True if is_ready == "true" else False if is_ready == "false" else None
+    )
 
     questions = await service.list_questions(
-        exam_id=exam_id_val, topic=topic_val,
-        is_corrected=is_corrected_val, is_ready_for_practice=is_ready_val,
+        exam_id=exam_id_val,
+        topic=topic_val,
+        is_corrected=is_corrected_val,
+        is_ready_for_practice=is_ready_val,
     )
     exams = await exam_svc.list_exams()
     flash = _get_flash_from_query(request)
@@ -224,9 +254,18 @@ async def question_list(
         request=request,
         name="questions/list.html",
         context=_ctx(
-            request, flash=flash, page_title="Preguntas", questions=questions, exams=exams,
-            filters={"exam_id": exam_id_val, "topic": topic_val, "is_corrected": is_corrected, "is_ready": is_ready},
-        )
+            request,
+            flash=flash,
+            page_title="Preguntas",
+            questions=questions,
+            exams=exams,
+            filters={
+                "exam_id": exam_id_val,
+                "topic": topic_val,
+                "is_corrected": is_corrected,
+                "is_ready": is_ready,
+            },
+        ),
     )
 
 
@@ -247,8 +286,12 @@ async def question_detail(
         request=request,
         name="questions/detail.html",
         context=_ctx(
-            request, flash=flash, page_title="Pregunta", question=question, answers=answers,
-        )
+            request,
+            flash=flash,
+            page_title="Pregunta",
+            question=question,
+            answers=answers,
+        ),
     )
 
 
@@ -262,9 +305,15 @@ async def question_correct(
         question = await service.get_question(question_id)
     except NotFoundError:
         return RedirectResponse(url="/questions", status_code=302)
-    return templates.TemplateResponse(request=request, name="questions/correct.html", context=_ctx(
-        request, page_title="Corregir OCR", question=question,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="questions/correct.html",
+        context=_ctx(
+            request,
+            page_title="Corregir OCR",
+            question=question,
+        ),
+    )
 
 
 @router.post("/questions/{question_id}/correct")
@@ -276,8 +325,12 @@ async def question_correct_submit(
     form = await request.form()
     corrected_text = form.get("corrected_text", "")
     notes = form.get("notes") or None
-    await service.correct_ocr_text(question_id=question_id, corrected_text=corrected_text, notes=notes)
-    return _redirect_with_flash(f"/questions/{question_id}", "Corrección guardada correctamente")
+    await service.correct_ocr_text(
+        question_id=question_id, corrected_text=corrected_text, notes=notes
+    )
+    return _redirect_with_flash(
+        f"/questions/{question_id}", "Corrección guardada correctamente"
+    )
 
 
 @router.get("/exams/{exam_id}/upload", response_class=HTMLResponse)
@@ -290,9 +343,15 @@ async def bulk_upload_page(
         exam = await service.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    return templates.TemplateResponse(request=request, name="questions/bulk_upload.html", context=_ctx(
-        request, page_title="Subir imágenes", exam=exam,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="questions/bulk_upload.html",
+        context=_ctx(
+            request,
+            page_title="Subir imágenes",
+            exam=exam,
+        ),
+    )
 
 
 @router.get("/exams/{exam_id}/questions/new", response_class=HTMLResponse)
@@ -303,12 +362,12 @@ async def manual_question_form(
 ) -> HTMLResponse:
     """Show form to manually add a question with correct answer."""
     from app.core.constants import TopicEnum
-    
+
     try:
         exam = await exam_svc.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    
+
     return templates.TemplateResponse(
         request=request,
         name="questions/manual_form.html",
@@ -318,7 +377,7 @@ async def manual_question_form(
             exam=exam,
             topics=list(TopicEnum),
             form_data=None,
-        )
+        ),
     )
 
 
@@ -331,22 +390,21 @@ async def manual_question_create(
     a_svc: AnswerService = Depends(get_answer_service),
 ) -> RedirectResponse:
     """Create question and correct answer from manual form."""
-    from app.core.constants import TopicEnum
-    
+
     try:
-        exam = await exam_svc.get_exam(exam_id)
+        await exam_svc.get_exam(exam_id)
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    
+
     form = await request.form()
-    
+
     # Extract form data
     question_text = form.get("question_text", "").strip()
     topic = form.get("topic", "")
     order_in_exam = form.get("order_in_exam")
     correct_answer_text = form.get("correct_answer_text", "").strip()
     explanation = form.get("explanation", "").strip() or None
-    
+
     # Validation
     errors = []
     if not question_text:
@@ -355,16 +413,16 @@ async def manual_question_create(
         errors.append("Debes seleccionar un tema")
     if not correct_answer_text:
         errors.append("La respuesta correcta es obligatoria")
-    
+
     if errors:
         # Re-render form with errors (simplified - just redirect back for now)
         # In a full implementation, you'd re-render with error messages
         return _redirect_with_flash(
             f"/exams/{exam_id}/questions/new",
             "Error: " + ", ".join(errors),
-            msg_type="error"
+            msg_type="error",
         )
-    
+
     try:
         # Create question (marked as manually created, not from OCR)
         question = await q_svc.create_question(
@@ -376,14 +434,14 @@ async def manual_question_create(
             extracted_text=None,
             confidence_score=None,
         )
-        
+
         # Mark as corrected (since it's manually entered, it's considered correct)
         await q_svc.update_question(
             question_id=question.id,
             is_corrected=True,
-            correction_notes="Pregunta creada manualmente (sin OCR)"
+            correction_notes="Pregunta creada manualmente (sin OCR)",
         )
-        
+
         # Create the correct answer
         await a_svc.create_answer(
             question_id=question.id,
@@ -392,24 +450,26 @@ async def manual_question_create(
             explanation=explanation,
             display_order=0,
         )
-        
+
         return _redirect_with_flash(
             f"/questions/{question.id}",
-            "Pregunta y respuesta correcta guardadas. Ahora podés agregar respuestas incorrectas (distractores)."
+            "Pregunta y respuesta correcta guardadas. Ahora podés agregar respuestas incorrectas (distractores).",
         )
-        
+
     except Exception as e:
         # Log error and redirect with message
         import logging
+
         logging.getLogger(__name__).error(f"Error creating manual question: {e}")
         return _redirect_with_flash(
             f"/exams/{exam_id}/questions/new",
             f"Error al guardar: {str(e)}",
-            msg_type="error"
+            msg_type="error",
         )
 
 
 # ── Answers ──────────────────────────────────────────────────
+
 
 @router.get("/questions/{question_id}/answers/new", response_class=HTMLResponse)
 async def answer_new(
@@ -421,9 +481,16 @@ async def answer_new(
         question = await q_svc.get_question(question_id)
     except NotFoundError:
         return RedirectResponse(url="/questions", status_code=302)
-    return templates.TemplateResponse(request=request, name="answers/form.html", context=_ctx(
-        request, page_title="Nueva respuesta", question=question, answer=None,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="answers/form.html",
+        context=_ctx(
+            request,
+            page_title="Nueva respuesta",
+            question=question,
+            answer=None,
+        ),
+    )
 
 
 @router.post("/questions/{question_id}/answers/new")
@@ -440,10 +507,14 @@ async def answer_create(
         explanation=form.get("explanation") or None,
         is_common_misconception=form.get("is_common_misconception") == "on",
     )
-    return _redirect_with_flash(f"/questions/{question_id}", "Respuesta agregada correctamente")
+    return _redirect_with_flash(
+        f"/questions/{question_id}", "Respuesta agregada correctamente"
+    )
 
 
-@router.get("/questions/{question_id}/answers/{answer_id}/edit", response_class=HTMLResponse)
+@router.get(
+    "/questions/{question_id}/answers/{answer_id}/edit", response_class=HTMLResponse
+)
 async def answer_edit(
     request: Request,
     question_id: int,
@@ -456,9 +527,16 @@ async def answer_edit(
         answer = await a_svc.get_answer(answer_id)
     except NotFoundError:
         return RedirectResponse(url=f"/questions/{question_id}", status_code=302)
-    return templates.TemplateResponse(request=request, name="answers/form.html", context=_ctx(
-        request, page_title="Editar respuesta", question=question, answer=answer,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="answers/form.html",
+        context=_ctx(
+            request,
+            page_title="Editar respuesta",
+            question=question,
+            answer=answer,
+        ),
+    )
 
 
 @router.post("/questions/{question_id}/answers/{answer_id}/edit")
@@ -497,12 +575,20 @@ async def answer_manage(
         answers = await a_svc.list_answers(question_id)
     except NotFoundError:
         return RedirectResponse(url="/questions", status_code=302)
-    return templates.TemplateResponse(request=request, name="answers/manage.html", context=_ctx(
-        request, page_title="Gestionar respuestas", question=question, answers=answers,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="answers/manage.html",
+        context=_ctx(
+            request,
+            page_title="Gestionar respuestas",
+            question=question,
+            answers=answers,
+        ),
+    )
 
 
 # ── Practice ─────────────────────────────────────────────────
+
 
 @router.get("/practice", response_class=HTMLResponse)
 async def practice_start(
@@ -515,8 +601,11 @@ async def practice_start(
         request=request,
         name="practice/start.html",
         context=_ctx(
-            request, flash=flash, page_title="Iniciar práctica", exams=exams,
-        )
+            request,
+            flash=flash,
+            page_title="Iniciar práctica",
+            exams=exams,
+        ),
     )
 
 
@@ -551,18 +640,32 @@ async def practice_play(
     try:
         session = await service.get_session(session_id)
         if session.is_completed:
-            return RedirectResponse(url=f"/practice/{session_id}/results", status_code=302)
+            return RedirectResponse(
+                url=f"/practice/{session_id}/results", status_code=302
+            )
         question = await service.get_next_question(session_id)
         if question is None:
             await service.complete_session(session_id)
-            return RedirectResponse(url=f"/practice/{session_id}/results", status_code=302)
+            return RedirectResponse(
+                url=f"/practice/{session_id}/results", status_code=302
+            )
         answers = await a_svc.list_answers(question.id)
-        random.shuffle(answers)  # Randomize answer order so correct answer isn't always first
+        random.shuffle(
+            answers
+        )  # Randomize answer order so correct answer isn't always first
     except NotFoundError:
         return RedirectResponse(url="/practice", status_code=302)
-    return templates.TemplateResponse(request=request, name="practice/question.html", context=_ctx(
-        request, page_title="Práctica", session=session, question=question, answers=answers,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="practice/question.html",
+        context=_ctx(
+            request,
+            page_title="Práctica",
+            session=session,
+            question=question,
+            answers=answers,
+        ),
+    )
 
 
 @router.post("/practice/{session_id}/answer")
@@ -593,7 +696,9 @@ async def practice_skip(
     form = await request.form()
     question_id = int(form["question_id"])
     time_spent = int(form.get("time_spent_seconds", 0))
-    await service.skip_question(session_id=session_id, question_id=question_id, time_spent_seconds=time_spent)
+    await service.skip_question(
+        session_id=session_id, question_id=question_id, time_spent_seconds=time_spent
+    )
     return RedirectResponse(url=f"/practice/{session_id}/play", status_code=303)
 
 
@@ -613,12 +718,17 @@ async def practice_results(
         request=request,
         name="practice/results.html",
         context=_ctx(
-            request, flash=flash, page_title="Resultados", session=session, results=results,
-        )
+            request,
+            flash=flash,
+            page_title="Resultados",
+            session=session,
+            results=results,
+        ),
     )
 
 
 # ── Search ───────────────────────────────────────────────────
+
 
 @router.get("/search/needs-review", response_class=HTMLResponse)
 async def needs_review(
@@ -629,13 +739,21 @@ async def needs_review(
 ) -> HTMLResponse:
     questions = await service.get_questions_needing_review(exam_id=exam_id)
     exams = await exam_svc.list_exams()
-    return templates.TemplateResponse(request=request, name="questions/review_queue.html", context=_ctx(
-        request, page_title="Revisar OCR", questions=questions,
-        exams=exams, selected_exam=exam_id,
-    ))
+    return templates.TemplateResponse(
+        request=request,
+        name="questions/review_queue.html",
+        context=_ctx(
+            request,
+            page_title="Revisar OCR",
+            questions=questions,
+            exams=exams,
+            selected_exam=exam_id,
+        ),
+    )
 
 
 # ── Analytics ────────────────────────────────────────────────
+
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_dashboard(
@@ -651,9 +769,13 @@ async def analytics_dashboard(
         request=request,
         name="analytics/dashboard.html",
         context=_ctx(
-            request, flash=flash, page_title="Estadísticas", stats=stats,
-            progress=progress, performance=performance,
-        )
+            request,
+            flash=flash,
+            page_title="Estadísticas",
+            stats=stats,
+            progress=progress,
+            performance=performance,
+        ),
     )
 
 
@@ -671,7 +793,11 @@ async def analytics_weak_areas(
         request=request,
         name="analytics/weak_areas.html",
         context=_ctx(
-            request, flash=flash, page_title="Áreas débiles", weak_areas=weak,
-            history=history, threshold=threshold,
-        )
+            request,
+            flash=flash,
+            page_title="Áreas débiles",
+            weak_areas=weak,
+            history=history,
+            threshold=threshold,
+        ),
     )
