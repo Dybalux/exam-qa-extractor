@@ -14,7 +14,13 @@ from app.config import get_settings
 from app.core.exceptions import (
     ConflictError,
     ExamStudyError,
+    FileValidationError,
+    MalformedImportError,
     NotFoundError,
+    OCRProcessingError,
+    PayloadTooLargeError,
+    StorageError,
+    UnknownSchemaVersion,
     ValidationError,
 )
 from app.db.init_db import create_tables
@@ -71,6 +77,36 @@ async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse
 @app.exception_handler(ValidationError)
 async def validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": exc.message, "extra": exc.details})
+
+
+@app.exception_handler(FileValidationError)
+async def file_validation_handler(request: Request, exc: FileValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": exc.message, "extra": exc.details})
+
+
+@app.exception_handler(OCRProcessingError)
+async def ocr_handler(request: Request, exc: OCRProcessingError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": exc.message, "extra": exc.details})
+
+
+@app.exception_handler(StorageError)
+async def storage_handler(request: Request, exc: StorageError) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": exc.message})
+
+
+@app.exception_handler(MalformedImportError)
+async def malformed_import_handler(request: Request, exc: MalformedImportError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": exc.message, "validation_errors": exc.details})
+
+
+@app.exception_handler(UnknownSchemaVersion)
+async def unknown_schema_handler(request: Request, exc: UnknownSchemaVersion) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": exc.message})
+
+
+@app.exception_handler(PayloadTooLargeError)
+async def payload_too_large_handler(request: Request, exc: PayloadTooLargeError) -> JSONResponse:
+    return JSONResponse(status_code=413, content={"detail": exc.message})
 
 
 @app.exception_handler(ExamStudyError)
