@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from app.models.answer import Answer
     from app.models.exam import Exam
     from app.models.question import Question
+    from app.models.topic import Topic
 
 from app.core.exceptions import MalformedImportError, UnknownSchemaVersion
 from app.schemas.json_io import (
@@ -304,6 +305,62 @@ class JsonIOService:
     # ------------------------------------------------------------------
     # Import: diff helpers
     # ------------------------------------------------------------------
+
+    async def _load_topics_map(self) -> dict[str, Topic]:
+        """Load all Topic records into a slug→Topic dict.
+
+        Bulk select avoids N+1 queries when resolving topic slugs
+        during import (design decision: bulk select over per-record fetch).
+        """
+        from app.models.topic import Topic
+
+        result = await self.session.execute(select(Topic))
+        return {t.slug: t for t in result.scalars().all()}
+
+    async def _resolve_or_create_topic(
+        self,
+        topic_slug: str,
+        topics_map: dict[str, "Topic"],
+        *,
+        _default_subject_slug: str = "sistemas-operativos",
+    ) -> "Topic":
+        """Resolve a topic slug to a Topic, creating it if missing.
+
+        Per REQ-IMP-2: unrecognized topics are dynamically created
+        under the default Subject (slugged 'sistemas-operativos').
+
+        Args:
+            topic_slug: The topic slug from the import payload.
+            topics_map: Existing topics dict (mutated in-place on create).
+            _default_subject_slug: Slug of the fallback parent Subject.
+
+        Returns:
+            The existing or newly-created Topic instance.
+        """
+        from app.models.subject import Subject
+        from app.models.topic import Topic
+
+        if topic_slug in topics_map:
+            return topics_map[topic_slug]
+
+        # Resolve default subject.
+        subj_result = await self.session.execute(
+            select(Subject).where(Subject.slug == _default_subject_slug)
+        )
+        subject = subj_result.scalar_one_or_none()
+
+        # If default subject is missing, create it.
+        if subject is None:
+            subject = Subject(name="Sistemas Operativos", slug=_default_subject_slug)
+            self.session.add(subject)
+            await self.session.flush()
+
+        topic = Topic(name=topic_slug, slug=topic_slug, subject_id=subject.id)
+        self.session.add(topic)
+        await self.session.flush()
+        topics_map[topic_slug] = topic
+        self._logger.info("dynamically created topic: %s", topic_slug)
+        return topic
 
     async def _load_questions_with_relations(
         self,
@@ -574,6 +631,9 @@ class JsonIOService:
             db_answers = list(db_answers_result.scalars().all())
             db_answer_by_uuid: dict[str, Answer] = {a.uuid: a for a in db_answers}
 
+            # Pre-fetch all topics into a slug→Topic map (bulk select, O(1)).
+            topics_map = await self._load_topics_map()
+
             created = 0
             updated = 0
             deleted = 0
@@ -636,12 +696,16 @@ class JsonIOService:
             }
             for json_q in parsed_questions:
                 exam = exam_map[json_q.exam_context.uuid]
+                topic_obj = await self._resolve_or_create_topic(
+                    json_q.topic, topics_map
+                )
                 existing = question_map.get(json_q.uuid)
                 if existing is not None:
                     if not self._question_matches_db(json_q, existing, existing.exam):
                         existing.question_text = json_q.question_text
                         existing.extracted_text = json_q.extracted_text
-                        existing.topic = json_q.topic
+                        existing.topic_id = topic_obj.id
+                        existing.topic = json_q.topic  # type: ignore[method-assign]
                         existing.order_in_exam = json_q.order_in_exam
                         existing.is_corrected = json_q.is_corrected
                         existing.correction_notes = json_q.correction_notes
@@ -655,6 +719,7 @@ class JsonIOService:
                         exam_id=exam.id,
                         question_text=json_q.question_text,
                         extracted_text=json_q.extracted_text,
+                        topic_id=topic_obj.id,
                         topic=json_q.topic,
                         order_in_exam=json_q.order_in_exam,
                         is_corrected=json_q.is_corrected,
