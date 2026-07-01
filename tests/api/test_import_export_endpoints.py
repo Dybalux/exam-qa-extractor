@@ -40,6 +40,8 @@ from app.core.constants import AnswerType  # noqa: F401
 from app.models.answer import Answer  # noqa: F401
 from app.models.exam import Exam  # noqa: F401
 from app.models.question import Question  # noqa: F401
+from app.models.subject import Subject  # noqa: F401
+from app.models.topic import Topic  # noqa: F401
 from app.schemas.json_io import (
     ExportFileSchema,
     ImportApplyResultSchema,
@@ -63,6 +65,25 @@ def _attachment_filename(content_disposition: str) -> str:
     m = re.search(r'filename="([^"]+)"', content_disposition)
     assert m, f"Content-Disposition missing filename: {content_disposition!r}"
     return m.group(1)
+
+
+async def _seed_subject_and_topic(
+    db_session: AsyncSession,
+    subject_slug: str = "sistemas-operativos",
+    topic_slug: str = "other",
+) -> tuple[Subject, Topic]:
+    """Create a default Subject and an 'other' Topic, return both.
+
+    Required after migration 005 enforces NOT NULL on
+    ``questions.topic_id`` and ``exams.subject_id``.
+    """
+    subject = Subject(name="Sistemas Operativos", slug=subject_slug)
+    db_session.add(subject)
+    await db_session.flush()
+    topic = Topic(name="Otros", slug=topic_slug, subject_id=subject.id)
+    db_session.add(topic)
+    await db_session.flush()
+    return subject, topic
 
 
 @pytest.mark.asyncio
@@ -114,10 +135,12 @@ async def test_export_endpoint_populated_db(
     * its ``answers`` list has the seeded answer with all fields
       round-tripped.
     """
+    subject, topic = await _seed_subject_and_topic(db_session)
     exam = Exam(
         partial_number=1,
         exam_date=date(2026, 6, 4),
         topic_tags="algebra",
+        subject_id=subject.id,
     )
     db_session.add(exam)
     await db_session.flush()  # assigns exam.id
@@ -126,7 +149,7 @@ async def test_export_endpoint_populated_db(
         exam_id=exam.id,
         question_text="What is 2 + 2?",
         extracted_text="2 + 2",
-        topic="other",
+        topic_id=topic.id,
         order_in_exam=1,
     )
     db_session.add(question)
@@ -326,10 +349,13 @@ async def test_import_preview_without_confirm(
     """
     from sqlalchemy import func, select
 
-    exam = Exam(partial_number=1, topic_tags="seed")
+    subject, topic = await _seed_subject_and_topic(db_session)
+    exam = Exam(partial_number=1, topic_tags="seed", subject_id=subject.id)
     db_session.add(exam)
     await db_session.flush()
-    q = Question(exam_id=exam.id, question_text="Seed", topic="OTHER", order_in_exam=1)
+    q = Question(
+        exam_id=exam.id, question_text="Seed", topic_id=topic.id, order_in_exam=1
+    )
     db_session.add(q)
     await db_session.commit()
 
@@ -570,13 +596,14 @@ async def test_e2e_export_then_import_same_file_yields_zero_changes(
     is the strongest "DB is byte-equal to its pre-import state"
     assertion we can make at the HTTP boundary.
     """
-    exam = Exam(partial_number=1, topic_tags="seed")
+    subject, topic = await _seed_subject_and_topic(db_session)
+    exam = Exam(partial_number=1, topic_tags="seed", subject_id=subject.id)
     db_session.add(exam)
     await db_session.flush()
     question = Question(
         exam_id=exam.id,
         question_text="Original text",
-        topic="OTHER",
+        topic_id=topic.id,
         order_in_exam=1,
     )
     db_session.add(question)
@@ -653,13 +680,14 @@ async def test_e2e_export_then_import_modified_file_yields_expected_changes(
     service's diff counts as a change); we assert the question_text in
     the DB now matches the new value AND at least one row was touched.
     """
-    exam = Exam(partial_number=1, topic_tags="seed")
+    subject, topic = await _seed_subject_and_topic(db_session)
+    exam = Exam(partial_number=1, topic_tags="seed", subject_id=subject.id)
     db_session.add(exam)
     await db_session.flush()
     question = Question(
         exam_id=exam.id,
         question_text="Original text",
-        topic="OTHER",
+        topic_id=topic.id,
         order_in_exam=1,
     )
     db_session.add(question)

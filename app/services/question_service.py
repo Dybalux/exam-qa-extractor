@@ -99,7 +99,6 @@ class QuestionService:
             exam_id=exam_id,
             question_text=question_text.strip(),
             topic_id=topic_id,
-            topic=topic,
             order_in_exam=order_in_exam,
             image_id=image_id,
             extracted_text=extracted_text,
@@ -221,7 +220,6 @@ class QuestionService:
         if topic is not None:
             topic_id = await self._resolve_topic_id(topic)
             question.topic_id = topic_id
-            question.topic = topic
 
         if order_in_exam is not None:
             if not (1 <= order_in_exam <= 50):
@@ -340,7 +338,6 @@ class QuestionService:
                 extracted_text=data.get("extracted_text"),
                 confidence_score=data.get("confidence_score"),
                 topic_id=topic_id,
-                topic=topic_slug,
                 order_in_exam=data.get("order_in_exam", i),
             )
             self.session.add(question)

@@ -705,7 +705,6 @@ class JsonIOService:
                         existing.question_text = json_q.question_text
                         existing.extracted_text = json_q.extracted_text
                         existing.topic_id = topic_obj.id
-                        existing.topic = json_q.topic  # type: ignore[method-assign]
                         existing.order_in_exam = json_q.order_in_exam
                         existing.is_corrected = json_q.is_corrected
                         existing.correction_notes = json_q.correction_notes
@@ -720,7 +719,6 @@ class JsonIOService:
                         question_text=json_q.question_text,
                         extracted_text=json_q.extracted_text,
                         topic_id=topic_obj.id,
-                        topic=json_q.topic,
                         order_in_exam=json_q.order_in_exam,
                         is_corrected=json_q.is_corrected,
                         correction_notes=json_q.correction_notes,

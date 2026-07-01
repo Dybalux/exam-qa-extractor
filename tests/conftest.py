@@ -57,6 +57,8 @@ from app.models import (
     Answer,  # noqa: F401
     Exam,  # noqa: F401
     Question,  # noqa: F401
+    Subject,  # noqa: F401
+    Topic,  # noqa: F401
 )
 
 
@@ -115,6 +117,36 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
     )
     async with session_factory() as session:
         yield session
+
+
+@pytest_asyncio.fixture
+async def default_subject(db_session: AsyncSession) -> Subject:
+    """Create a default 'Sistemas Operativos' subject with an 'other' topic.
+
+    Returns the Subject instance. The 'other' topic is also created
+    and can be obtained via the Subject's ``topics`` relationship.
+    """
+    from sqlalchemy import select as _select
+
+    result = await db_session.execute(
+        _select(Subject).where(Subject.slug == "sistemas-operativos")
+    )
+    subject = result.scalar_one_or_none()
+    if subject is None:
+        subject = Subject(name="Sistemas Operativos", slug="sistemas-operativos")
+        db_session.add(subject)
+        await db_session.flush()
+
+    # Ensure 'other' topic exists.
+    result = await db_session.execute(
+        _select(Topic).where(Topic.slug == "other", Topic.subject_id == subject.id)
+    )
+    if result.scalar_one_or_none() is None:
+        topic = Topic(name="Otros", slug="other", subject_id=subject.id)
+        db_session.add(topic)
+        await db_session.flush()
+
+    return subject
 
 
 @pytest_asyncio.fixture

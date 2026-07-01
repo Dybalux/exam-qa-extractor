@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.answer import Answer
 from app.models.exam import Exam
 from app.models.question import Question
+from app.models.subject import Subject
+from app.models.topic import Topic
 from app.schemas.json_io import (
     AnswerExportSchema,
     ExamContextExportSchema,
@@ -41,17 +43,52 @@ async def _make_exam(
     partial_number: int = 1,
     exam_date: "date | None" = None,
     tags: str | None = "algebra",
+    subject_id: int | None = None,
 ) -> Exam:
     from datetime import date as _date
+
+    if subject_id is None:
+        subject_id = await _ensure_default_subject(session)
 
     exam = Exam(
         partial_number=partial_number,
         exam_date=exam_date if exam_date is not None else _date(2024, 6, 15),
         topic_tags=tags,
+        subject_id=subject_id,
     )
     session.add(exam)
     await session.flush()
     return exam
+
+
+async def _ensure_default_subject(session: AsyncSession) -> int:
+    """Return the id of a default subject, creating it if necessary."""
+    from sqlalchemy import select as _select
+
+    result = await session.execute(
+        _select(Subject).where(Subject.slug == "sistemas-operativos")
+    )
+    subject = result.scalar_one_or_none()
+    if subject is None:
+        subject = Subject(name="Sistemas Operativos", slug="sistemas-operativos")
+        session.add(subject)
+        await session.flush()
+    return subject.id
+
+
+async def _ensure_default_topic(session: AsyncSession, subject_id: int) -> int:
+    """Return the id of a default 'other' topic, creating it if necessary."""
+    from sqlalchemy import select as _select
+
+    result = await session.execute(
+        _select(Topic).where(Topic.slug == "other", Topic.subject_id == subject_id)
+    )
+    topic = result.scalar_one_or_none()
+    if topic is None:
+        topic = Topic(name="Otros", slug="other", subject_id=subject_id)
+        session.add(topic)
+        await session.flush()
+    return topic.id
 
 
 async def _make_question(
@@ -62,20 +99,21 @@ async def _make_question(
     is_corrected: bool = False,
     answers: list[tuple[str, str]] | None = None,
 ) -> Question:
+    topic_id = await _ensure_default_topic(session, exam.subject_id)
     q = Question(
         exam_id=exam.id,
         question_text=text,
-        topic=topic,
+        topic_id=topic_id,
         order_in_exam=1,
         is_corrected=is_corrected,
     )
     session.add(q)
     await session.flush()
     if answers:
-        for idx, (text, atype) in enumerate(answers):
+        for idx, (atext, atype) in enumerate(answers):
             a = Answer(
                 question_id=q.id,
-                answer_text=text,
+                answer_text=atext,
                 answer_type=atype,
                 display_order=idx,
             )
