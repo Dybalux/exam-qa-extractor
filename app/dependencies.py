@@ -63,6 +63,21 @@ async def get_analytics_service(db: AsyncSession = Depends(get_db)) -> Analytics
     return AnalyticsService(db)
 
 
+async def get_all_topics(
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, str]]:
+    """Dependency that provides all topics as {slug, name} dicts.
+
+    Used by page routes to render dynamic topic filters.
+    """
+    from sqlalchemy import select
+
+    from app.models.topic import Topic
+
+    result = await db.execute(select(Topic).order_by(Topic.name))
+    return [{"slug": t.slug, "name": t.name} for t in result.scalars().all()]
+
+
 async def get_ocr_service() -> OCRService:
     """Dependency for OCRService (stateless)."""
     return OCRService()

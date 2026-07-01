@@ -11,6 +11,7 @@ from app.api import (
     questions,
     search,
 )
+from app.api.v1.endpoints.subjects import router as subjects_router
 
 api_router = APIRouter()
 
@@ -23,3 +24,4 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["analytic
 # Empty prefix: the export/import endpoints live at /api/v1/{export,import},
 # NOT nested under /exams. The /api/v1 part comes from app/main.py.
 api_router.include_router(import_export.router, prefix="", tags=["import-export"])
+api_router.include_router(subjects_router, prefix="", tags=["subjects", "topics"])

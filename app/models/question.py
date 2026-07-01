@@ -4,10 +4,8 @@ import uuid as _uuid
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import CheckConstraint, Float, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import TopicEnum
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -29,7 +27,6 @@ class Question(Base):
             name="check_valid_order",
         ),
         Index("idx_question_exam", "exam_id"),
-        Index("idx_question_topic", "topic"),
         Index("idx_question_corrected", "is_corrected"),
         Index("idx_question_topic_id", "topic_id"),
     )
@@ -54,14 +51,8 @@ class Question(Base):
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    topic_id: Mapped[int | None] = mapped_column(
-        ForeignKey("topics.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    _topic: Mapped[str] = mapped_column(
-        "topic",
-        String(50),
-        default=TopicEnum.OTHER.value,
+    topic_id: Mapped[int] = mapped_column(
+        ForeignKey("topics.id", ondelete="RESTRICT"),
         nullable=False,
     )
     order_in_exam: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -88,23 +79,27 @@ class Question(Base):
     )
 
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize Question and handle deprecated topic keyword argument."""
-        topic_val = kwargs.pop("topic", None)
-        super().__init__(**kwargs)
-        if topic_val is not None:
-            self.topic = topic_val  # type: ignore[method-assign]
+        """Initialize Question, ignoring the deprecated 'topic' keyword argument.
 
-    @hybrid_property
+        The legacy ``questions.topic`` string column was dropped in migration 005.
+        Topic association is now exclusively via ``topic_id``.
+        The ``topic`` kwarg is still accepted for backward compatibility with
+        service layers that pass it, but is silently discarded.
+        """
+        kwargs.pop("topic", None)
+        super().__init__(**kwargs)
+
+    @property
     def topic(self) -> str:
-        """Get the topic slug from the relation or fallback to the deprecated field."""
+        """Get the topic slug from the relationship.
+
+        Returns the slug of the associated Topic, or ``"other"`` if no
+        topic is linked (shouldn't happen after migration 005 enforces
+        NOT NULL on topic_id).
+        """
         if self.topic_relation:
             return self.topic_relation.slug
-        return self._topic
-
-    @topic.setter  # type: ignore[no-redef]
-    def topic(self, value: str) -> None:
-        """Set the topic value."""
-        self._topic = value
+        return "other"
 
     def __repr__(self) -> str:
         return f"<Question(id={self.id}, exam_id={self.exam_id}, topic={self.topic})>"

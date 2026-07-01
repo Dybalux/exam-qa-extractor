@@ -9,7 +9,7 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 (Foundation) → PR 2 (Core & Services) → PR 3 (API & Pages) |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | stacked-to-main |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -47,8 +47,8 @@ Chain strategy: pending
 
 ## Phase 3: REST API & Pages Integration (PR 3)
 
-- [ ] 3.1 Create `app/api/v1/endpoints/subjects.py` exposing CRUD endpoints for subjects/topics.
-- [ ] 3.2 Register endpoints in `app/api/__init__.py` or main router.
-- [ ] 3.3 Refactor `app/api/pages.py` to query dynamic topics for dashboard/exam filters.
-- [ ] 3.4 Update Jinja2 HTML templates under `app/templates/` to list topics dynamically instead of using hardcoded values.
-- [ ] 3.5 Write integration tests in `tests/api/test_subject_endpoints.py` to verify REST API calls and page rendering.
+- [x] 3.1 Create `app/api/v1/endpoints/subjects.py` exposing CRUD endpoints for subjects/topics.
+- [x] 3.2 Register endpoints in `app/api/__init__.py` or main router.
+- [x] 3.3 Refactor `app/api/pages.py` to query dynamic topics for dashboard/exam filters.
+- [x] 3.4 Update Jinja2 HTML templates under `app/templates/` to list topics dynamically instead of using hardcoded values.
+- [x] 3.5 Write integration tests in `tests/api/test_subject_endpoints.py` to verify REST API calls and page rendering.

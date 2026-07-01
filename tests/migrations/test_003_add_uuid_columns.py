@@ -35,8 +35,39 @@ def seeded_db(tmp_path: Path) -> Path:
     from app.models.practice_response import PracticeResponse  # noqa: F401
     from app.models.practice_session import PracticeSession  # noqa: F401
     from app.models.question import Question  # noqa: F401
+    from app.models.subject import Subject  # noqa: F401
+    from app.models.topic import Topic  # noqa: F401
 
     Base.metadata.create_all(engine)
+
+    # Seed a default subject + topic so exams and questions satisfy
+    # the NOT NULL constraints on subject_id / topic_id.
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO subjects (uuid, name, slug, created_at, updated_at) "
+                "VALUES ('s-11111111-1111-4111-8111-111111111111', "
+                "'Sistemas Operativos', 'sistemas-operativos', '2026-06-03 00:00:00', "
+                "'2026-06-03 00:00:00')"
+            )
+        )
+        subj_row = conn.execute(
+            text("SELECT id FROM subjects WHERE slug='sistemas-operativos'")
+        ).first()
+        subject_id = subj_row[0]
+        conn.execute(
+            text(
+                "INSERT INTO topics (uuid, name, slug, subject_id, created_at, updated_at) "
+                "VALUES ('t-22222222-2222-4222-8222-222222222222', "
+                "'Otros', 'other', :sid, '2026-06-03 00:00:00', '2026-06-03 00:00:00')"
+            ),
+            {"sid": subject_id},
+        )
+        top_row = conn.execute(
+            text("SELECT id FROM topics WHERE slug='other'")
+        ).first()
+        topic_id = top_row[0]
+
     # Mirror 002's net effect: drop the difficulty column. SQLite needs
     # a table rebuild to drop a column referenced by a check constraint.
     # The test simulates the pre-uuid state, so we also drop the uuid
@@ -54,7 +85,7 @@ def seeded_db(tmp_path: Path) -> Path:
                 question_text TEXT NOT NULL,
                 extracted_text TEXT,
                 confidence_score FLOAT,
-                topic VARCHAR(50) NOT NULL,
+                topic_id INTEGER NOT NULL,
                 order_in_exam INTEGER,
                 is_corrected BOOLEAN NOT NULL,
                 correction_notes TEXT,
@@ -63,17 +94,18 @@ def seeded_db(tmp_path: Path) -> Path:
                 updated_at DATETIME NOT NULL,
                 FOREIGN KEY(exam_id) REFERENCES exams(id) ON DELETE CASCADE,
                 FOREIGN KEY(image_id) REFERENCES exam_images(id) ON DELETE SET NULL,
+                FOREIGN KEY(topic_id) REFERENCES topics(id) ON DELETE RESTRICT,
                 CHECK (order_in_exam BETWEEN 1 AND 50)
             );
             INSERT INTO questions_new
             SELECT id, exam_id, image_id, question_text, extracted_text,
-                   confidence_score, topic, order_in_exam, is_corrected,
+                   confidence_score, topic_id, order_in_exam, is_corrected,
                    correction_notes, has_code_in_answers, created_at, updated_at
             FROM questions;
             DROP TABLE questions;
             ALTER TABLE questions_new RENAME TO questions;
             CREATE INDEX idx_question_exam ON questions(exam_id);
-            CREATE INDEX idx_question_topic ON questions(topic);
+            CREATE INDEX idx_question_topic_id ON questions(topic_id);
             CREATE INDEX idx_question_corrected ON questions(is_corrected);
 
             -- Drop the uuid columns the model just created; the
@@ -83,17 +115,21 @@ def seeded_db(tmp_path: Path) -> Path:
                 partial_number INTEGER NOT NULL,
                 exam_date DATE,
                 topic_tags TEXT,
+                subject_id INTEGER NOT NULL,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
+                FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE RESTRICT,
                 CHECK (partial_number IN (1, 2, 3, 4))
             );
             INSERT INTO exams_new
-            SELECT id, partial_number, exam_date, topic_tags, created_at, updated_at
+            SELECT id, partial_number, exam_date, topic_tags, subject_id,
+                   created_at, updated_at
             FROM exams;
             DROP TABLE exams;
             ALTER TABLE exams_new RENAME TO exams;
             CREATE INDEX idx_exam_partial ON exams(partial_number);
             CREATE INDEX idx_exam_date ON exams(exam_date);
+            CREATE INDEX idx_exam_subject_id ON exams(subject_id);
 
             CREATE TABLE answers_new (
                 id INTEGER NOT NULL PRIMARY KEY,
@@ -125,25 +161,27 @@ def seeded_db(tmp_path: Path) -> Path:
     # Seed: 3 exams, 5 questions, 4 answers. The schema is the
     # pre-uuid (post-002) state, so the INSERTs omit the uuid column
     # — the migration under test adds it and backfills.
+    # subject_id and topic_id are required (NOT NULL after migration 005).
     with engine.begin() as conn:
         for p in (1, 2, 3):
             conn.execute(
                 text(
                     "INSERT INTO exams (partial_number, exam_date, topic_tags, "
-                    "created_at, updated_at) VALUES (:p, NULL, NULL, :ts, :ts)"
+                    "subject_id, created_at, updated_at) "
+                    "VALUES (:p, NULL, NULL, :sid, :ts, :ts)"
                 ),
-                {"p": p, "ts": "2026-06-03 00:00:00"},
+                {"p": p, "sid": subject_id, "ts": "2026-06-03 00:00:00"},
             )
         for i in range(1, 6):
             conn.execute(
                 text(
                     "INSERT INTO questions (exam_id, image_id, question_text, "
-                    "extracted_text, confidence_score, topic, order_in_exam, "
+                    "extracted_text, confidence_score, topic_id, order_in_exam, "
                     "is_corrected, correction_notes, has_code_in_answers, "
                     "created_at, updated_at) "
-                    "VALUES (1, NULL, :t, NULL, NULL, 'OTHER', :o, 0, NULL, 0, :ts, :ts)"
+                    "VALUES (1, NULL, :t, NULL, NULL, :tid, :o, 0, NULL, 0, :ts, :ts)"
                 ),
-                {"t": f"Q{i}", "o": i, "ts": "2026-06-03 00:00:00"},
+                {"t": f"Q{i}", "tid": topic_id, "o": i, "ts": "2026-06-03 00:00:00"},
             )
         for q_id, ans in [(1, "A"), (2, "B"), (3, "C"), (4, "D")]:
             conn.execute(

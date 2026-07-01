@@ -18,8 +18,21 @@ from app.db.base import Base
 from app.models.answer import Answer
 from app.models.exam import Exam
 from app.models.question import Question
+from app.models.subject import Subject
+from app.models.topic import Topic
 
 UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+async def _seed_subject_and_topic(session: AsyncSession) -> tuple[int, int]:
+    """Create a default subject and 'other' topic, return both IDs."""
+    subject = Subject(name="Sistemas Operativos", slug="sistemas-operativos")
+    session.add(subject)
+    await session.flush()
+    topic = Topic(name="Otros", slug="other", subject_id=subject.id)
+    session.add(topic)
+    await session.flush()
+    return subject.id, topic.id
 
 
 @pytest_asyncio.fixture
@@ -45,7 +58,8 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.mark.asyncio
 async def test_exam_auto_generates_uuid(session: AsyncSession) -> None:
-    exam = Exam(partial_number=1)
+    subject_id, _ = await _seed_subject_and_topic(session)
+    exam = Exam(partial_number=1, subject_id=subject_id)
     session.add(exam)
     await session.commit()
     await session.refresh(exam)
@@ -55,7 +69,10 @@ async def test_exam_auto_generates_uuid(session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_two_exams_get_distinct_uuids(session: AsyncSession) -> None:
-    a, b = Exam(partial_number=1), Exam(partial_number=2)
+    subject_id, _ = await _seed_subject_and_topic(session)
+    a, b = Exam(partial_number=1, subject_id=subject_id), Exam(
+        partial_number=2, subject_id=subject_id
+    )
     session.add_all([a, b])
     await session.commit()
     await session.refresh(a)
@@ -66,8 +83,9 @@ async def test_two_exams_get_distinct_uuids(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_caller_supplied_uuid_is_honored(session: AsyncSession) -> None:
     """Service code that pins identity (import flow) can pass an explicit uuid."""
+    subject_id, _ = await _seed_subject_and_topic(session)
     pinned = "11111111-2222-4333-8444-555555555555"
-    exam = Exam(uuid=pinned, partial_number=1)
+    exam = Exam(uuid=pinned, partial_number=1, subject_id=subject_id)
     session.add(exam)
     await session.commit()
     await session.refresh(exam)
@@ -76,11 +94,12 @@ async def test_caller_supplied_uuid_is_honored(session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_question_auto_generates_uuid(session: AsyncSession) -> None:
-    exam = Exam(partial_number=1)
+    subject_id, topic_id = await _seed_subject_and_topic(session)
+    exam = Exam(partial_number=1, subject_id=subject_id)
     session.add(exam)
     await session.flush()
-    q1 = Question(exam_id=exam.id, question_text="Q1")
-    q2 = Question(exam_id=exam.id, question_text="Q2")
+    q1 = Question(exam_id=exam.id, question_text="Q1", topic_id=topic_id)
+    q2 = Question(exam_id=exam.id, question_text="Q2", topic_id=topic_id)
     session.add_all([q1, q2])
     await session.commit()
     await session.refresh(q1)
@@ -92,10 +111,11 @@ async def test_question_auto_generates_uuid(session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_answer_auto_generates_uuid(session: AsyncSession) -> None:
-    exam = Exam(partial_number=1)
+    subject_id, topic_id = await _seed_subject_and_topic(session)
+    exam = Exam(partial_number=1, subject_id=subject_id)
     session.add(exam)
     await session.flush()
-    q = Question(exam_id=exam.id, question_text="Q")
+    q = Question(exam_id=exam.id, question_text="Q", topic_id=topic_id)
     session.add(q)
     await session.flush()
     a1 = Answer(question_id=q.id, answer_text="A", answer_type="correct")

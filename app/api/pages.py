@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.exceptions import NotFoundError
 from app.dependencies import (
+    get_all_topics,
     get_analytics_service,
     get_answer_service,
     get_exam_service,
@@ -232,6 +233,7 @@ async def question_list(
     is_ready: str | None = None,
     service: QuestionService = Depends(get_question_service),
     exam_svc: ExamService = Depends(get_exam_service),
+    topics: list[dict[str, str]] = Depends(get_all_topics),
 ) -> HTMLResponse:
     exam_id_val = int(exam_id) if exam_id and exam_id.strip() else None
     topic_val = topic if topic and topic.strip() else None
@@ -259,6 +261,7 @@ async def question_list(
             page_title="Preguntas",
             questions=questions,
             exams=exams,
+            topics=topics,
             filters={
                 "exam_id": exam_id_val,
                 "topic": topic_val,
@@ -359,9 +362,9 @@ async def manual_question_form(
     request: Request,
     exam_id: int,
     exam_svc: ExamService = Depends(get_exam_service),
+    topics: list[dict[str, str]] = Depends(get_all_topics),
 ) -> HTMLResponse:
     """Show form to manually add a question with correct answer."""
-    from app.core.constants import TopicEnum
 
     try:
         exam = await exam_svc.get_exam(exam_id)
@@ -375,7 +378,7 @@ async def manual_question_form(
             request,
             page_title="Nueva pregunta",
             exam=exam,
-            topics=list(TopicEnum),
+            topics=topics,
             form_data=None,
         ),
     )
@@ -594,6 +597,7 @@ async def answer_manage(
 async def practice_start(
     request: Request,
     exam_svc: ExamService = Depends(get_exam_service),
+    topics: list[dict[str, str]] = Depends(get_all_topics),
 ) -> HTMLResponse:
     exams = await exam_svc.list_exams()
     flash = _get_flash_from_query(request)
@@ -605,6 +609,7 @@ async def practice_start(
             flash=flash,
             page_title="Iniciar práctica",
             exams=exams,
+            topics=topics,
         ),
     )
 

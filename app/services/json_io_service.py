@@ -337,30 +337,31 @@ class JsonIOService:
         Returns:
             The existing or newly-created Topic instance.
         """
-        from app.models.subject import Subject
         from app.models.topic import Topic
 
         if topic_slug in topics_map:
             return topics_map[topic_slug]
 
-        # Resolve default subject.
-        subj_result = await self.session.execute(
-            select(Subject).where(Subject.slug == _default_subject_slug)
-        )
-        subject = subj_result.scalar_one_or_none()
-
-        # If default subject is missing, create it.
-        if subject is None:
-            subject = Subject(name="Sistemas Operativos", slug=_default_subject_slug)
-            self.session.add(subject)
-            await self.session.flush()
-
-        topic = Topic(name=topic_slug, slug=topic_slug, subject_id=subject.id)
+        # Resolve or create default subject.
+        subj = await self._resolve_default_subject(_default_subject_slug)
+        topic = Topic(name=topic_slug, slug=topic_slug, subject_id=subj.id)
         self.session.add(topic)
         await self.session.flush()
         topics_map[topic_slug] = topic
         self._logger.info("dynamically created topic: %s", topic_slug)
         return topic
+
+    async def _resolve_default_subject(self, slug: str = "sistemas-operativos"):
+        """Return the default Subject, creating it if it does not exist."""
+        from app.models.subject import Subject
+
+        result = await self.session.execute(select(Subject).where(Subject.slug == slug))
+        subject = result.scalar_one_or_none()
+        if subject is None:
+            subject = Subject(name="Sistemas Operativos", slug=slug)
+            self.session.add(subject)
+            await self.session.flush()
+        return subject
 
     async def _load_questions_with_relations(
         self,
@@ -655,6 +656,7 @@ class JsonIOService:
             # Step 4: UPSERT exams by uuid. ``exam_map`` starts from
             # the surviving (non-orphan) DB rows; we add newly
             # created Exam instances as we encounter them.
+            default_subject = await self._resolve_default_subject()
             exam_map: dict[str, Exam] = {
                 uuid: e
                 for uuid, e in db_exam_by_uuid.items()
@@ -679,6 +681,7 @@ class JsonIOService:
                         partial_number=ec.partial_number,
                         exam_date=ec.exam_date,
                         topic_tags=ec.topic_tags,
+                        subject_id=default_subject.id,
                     )
                     self.session.add(new_exam)
                     exam_map[ec.uuid] = new_exam
@@ -705,7 +708,6 @@ class JsonIOService:
                         existing.question_text = json_q.question_text
                         existing.extracted_text = json_q.extracted_text
                         existing.topic_id = topic_obj.id
-                        existing.topic = json_q.topic  # type: ignore[method-assign]
                         existing.order_in_exam = json_q.order_in_exam
                         existing.is_corrected = json_q.is_corrected
                         existing.correction_notes = json_q.correction_notes
@@ -720,7 +722,6 @@ class JsonIOService:
                         question_text=json_q.question_text,
                         extracted_text=json_q.extracted_text,
                         topic_id=topic_obj.id,
-                        topic=json_q.topic,
                         order_in_exam=json_q.order_in_exam,
                         is_corrected=json_q.is_corrected,
                         correction_notes=json_q.correction_notes,

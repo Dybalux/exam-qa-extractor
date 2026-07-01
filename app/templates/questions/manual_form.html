@@ -24,14 +24,14 @@
         {# Topic #}
         <div class="form-group">
           <label class="form-label">Tema *</label>
-          <select name="topic" class="form-control" required>
-            <option value="">Seleccionar tema...</option>
-            {% for topic in topics %}
-            <option value="{{ topic.value }}" {% if form_data and form_data.topic == topic.value %}selected{% endif %}>
-              {{ topic.value }}
-            </option>
-            {% endfor %}
-          </select>
+            <select name="topic" class="form-control" required>
+              <option value="">Seleccionar tema...</option>
+              {% for topic in topics %}
+              <option value="{{ topic.slug }}" {% if form_data and form_data.topic == topic.slug %}selected{% endif %}>
+                {{ topic.name }}
+              </option>
+              {% endfor %}
+            </select>
         </div>
 
         <div class="form-row">

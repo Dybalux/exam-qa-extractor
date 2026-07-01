@@ -45,13 +45,13 @@ class Exam(Base):
     partial_number: Mapped[int] = mapped_column(nullable=False)
     exam_date: Mapped[date | None] = mapped_column(nullable=True)
     topic_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
-    subject_id: Mapped[int | None] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL"),
-        nullable=True,
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("subjects.id", ondelete="RESTRICT"),
+        nullable=False,
     )
 
     # Relationships
-    subject: Mapped["Subject | None"] = relationship(
+    subject: Mapped["Subject"] = relationship(
         back_populates="exams",
     )
     images: Mapped[list["ExamImage"]] = relationship(
