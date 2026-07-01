@@ -228,7 +228,8 @@ async def test_export_answers_are_sorted_by_display_order(
     """Answers are exported in ``display_order`` ascending."""
     exam = await _make_exam(db_session, partial_number=1)
     # Insert answers in reverse display order.
-    q = Question(exam_id=exam.id, question_text="Q")
+    tid = await _ensure_default_topic(db_session, exam.subject_id)
+    q = Question(exam_id=exam.id, question_text="Q", topic_id=tid)
     db_session.add(q)
     await db_session.flush()
     for idx, text in enumerate(["third", "first", "second"]):
@@ -354,14 +355,19 @@ def _answer_dict(
 async def test_preview_no_db_writes(db_session: AsyncSession) -> None:
     """``preview_import`` must NOT add, update, or delete any rows."""
     # Seed an exam and a question so the DB is not empty.
+    subj_id = await _ensure_default_subject(db_session)
+    tid = await _ensure_default_topic(db_session, subj_id)
     exam = Exam(
         partial_number=1,
         exam_date=__import__("datetime").date(2024, 6, 15),
         topic_tags="a",
+        subject_id=subj_id,
     )
     db_session.add(exam)
     await db_session.flush()
-    q = Question(exam_id=exam.id, question_text="Seed", is_corrected=False)
+    q = Question(
+        exam_id=exam.id, question_text="Seed", topic_id=tid, is_corrected=False
+    )
     db_session.add(q)
     await db_session.commit()
 
@@ -416,7 +422,14 @@ async def test_preview_mixed_changes(db_session: AsyncSession) -> None:
     from datetime import date as _date
 
     # Seed 3 existing questions that will be the "update" half.
-    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15), topic_tags="algebra")
+    subj_id = await _ensure_default_subject(db_session)
+    tid = await _ensure_default_topic(db_session, subj_id)
+    exam = Exam(
+        partial_number=1,
+        exam_date=_date(2024, 6, 15),
+        topic_tags="algebra",
+        subject_id=subj_id,
+    )
     db_session.add(exam)
     await db_session.flush()
 
@@ -425,6 +438,7 @@ async def test_preview_mixed_changes(db_session: AsyncSession) -> None:
         q = Question(
             exam_id=exam.id,
             question_text=f"Old Q{i}",
+            topic_id=tid,
             is_corrected=False,
         )
         db_session.add(q)
@@ -505,7 +519,12 @@ async def test_preview_collects_all_validation_errors(
     db_session: AsyncSession,
 ) -> None:
     """3 malformed entries → a single error with 3 entries (NOT fail-fast)."""
-    exam = Exam(partial_number=1, exam_date=__import__("datetime").date(2024, 6, 15))
+    subj_id = await _ensure_default_subject(db_session)
+    exam = Exam(
+        partial_number=1,
+        exam_date=__import__("datetime").date(2024, 6, 15),
+        subject_id=subj_id,
+    )
     db_session.add(exam)
     await db_session.commit()
     exam_uuid = exam.uuid
@@ -557,13 +576,20 @@ async def test_preview_identical_content_reports_zero_changes(
     """A question that matches the DB byte-for-byte does NOT increment any counter."""
     from datetime import date as _date
 
-    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15), topic_tags="algebra")
+    subj_id = await _ensure_default_subject(db_session)
+    tid = await _ensure_default_topic(db_session, subj_id)
+    exam = Exam(
+        partial_number=1,
+        exam_date=_date(2024, 6, 15),
+        topic_tags="algebra",
+        subject_id=subj_id,
+    )
     db_session.add(exam)
     await db_session.flush()
     q = Question(
         exam_id=exam.id,
         question_text="Stable Q",
-        topic="OTHER",
+        topic_id=tid,
         order_in_exam=1,
         is_corrected=False,
         correction_notes=None,
@@ -578,7 +604,7 @@ async def test_preview_identical_content_reports_zero_changes(
                 uuid=q.uuid,
                 exam_uuid=exam.uuid,
                 text="Stable Q",
-                topic="OTHER",
+                topic="other",
             )
         ]
     )
@@ -598,11 +624,15 @@ async def test_preview_caps_preview_list_at_50_entries(
     from datetime import date as _date
 
     # Seed 60 questions so the delete set exceeds 50.
-    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15))
+    subj_id = await _ensure_default_subject(db_session)
+    tid = await _ensure_default_topic(db_session, subj_id)
+    exam = Exam(partial_number=1, exam_date=_date(2024, 6, 15), subject_id=subj_id)
     db_session.add(exam)
     await db_session.flush()
     for i in range(60):
-        db_session.add(Question(exam_id=exam.id, question_text=f"Q{i}"))
+        db_session.add(
+            Question(exam_id=exam.id, question_text=f"Q{i}", topic_id=tid)
+        )
     await db_session.commit()
 
     payload = _envelope_dict([])  # empty JSON → all 60 are orphans
@@ -632,10 +662,12 @@ async def _seed_exam(
     tags: str | None = "algebra",
 ) -> Exam:
     """Create and flush an Exam in the test session."""
+    subj_id = await _ensure_default_subject(session)
     exam = Exam(
         partial_number=partial_number,
         exam_date=exam_date if exam_date is not None else _dt.date(2024, 6, 15),
         topic_tags=tags,
+        subject_id=subj_id,
     )
     session.add(exam)
     await session.flush()
@@ -651,10 +683,11 @@ async def _seed_question(
     answers: list[tuple[str, str]] | None = None,
 ) -> Question:
     """Create a Question with optional Answers."""
+    tid = await _ensure_default_topic(session, exam.subject_id)
     q = Question(
         exam_id=exam.id,
         question_text=text,
-        topic=topic,
+        topic_id=tid,
         order_in_exam=1,
         is_corrected=is_corrected,
     )
@@ -1193,10 +1226,13 @@ async def _seed_baseline_question(
     session: AsyncSession,
 ) -> tuple[Exam, Question, Answer]:
     """Seed the DB with one question + one answer matching ``_BASELINE_QUESTION``."""
+    subj_id = await _ensure_default_subject(session)
+    tid = await _ensure_default_topic(session, subj_id)
     exam = Exam(
         partial_number=_BASELINE_QUESTION["exam_partial_number"],
         exam_date=_BASELINE_QUESTION["exam_date"],
         topic_tags=_BASELINE_QUESTION["exam_topic_tags"],
+        subject_id=subj_id,
     )
     session.add(exam)
     await session.flush()
@@ -1204,7 +1240,7 @@ async def _seed_baseline_question(
         exam_id=exam.id,
         question_text=_BASELINE_QUESTION["question_text"],
         extracted_text=_BASELINE_QUESTION["extracted_text"],
-        topic=_BASELINE_QUESTION["topic"],
+        topic_id=tid,
         order_in_exam=_BASELINE_QUESTION["order_in_exam"],
         is_corrected=_BASELINE_QUESTION["is_corrected"],
         correction_notes=_BASELINE_QUESTION["correction_notes"],

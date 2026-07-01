@@ -36,6 +36,7 @@ async def create_exam(
         partial_number=payload.partial_number,
         exam_date=payload.exam_date,
         topic_tags=payload.topic_tags,
+        subject_id=payload.subject_id,
     )
     return ExamResponse.model_validate(exam)
 

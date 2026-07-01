@@ -11,6 +11,9 @@ class ExamCreate(BaseModel):
     partial_number: int = Field(..., ge=1, le=4, description="Partial number (1-4)")
     exam_date: date | None = Field(None, description="Date of the exam")
     topic_tags: str | None = Field(None, description="Comma-separated topic tags")
+    subject_id: int | None = Field(
+        None, description="Subject ID. Defaults to 'sistemas-operativos'."
+    )
 
 
 class ExamUpdate(BaseModel):

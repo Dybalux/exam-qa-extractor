@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.exam import Exam
+from app.models.subject import Subject
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,47 @@ class ExamService:
         """
         self.session = session
 
+    async def _resolve_subject_id(self, subject_id: int | None) -> int:
+        """Resolve subject_id, defaulting to 'sistemas-operativos'.
+
+        Args:
+            subject_id: Optional explicit subject ID.
+
+        Returns:
+            The resolved subject's primary key.
+
+        Raises:
+            NotFoundError: If an explicit subject_id is provided but not found.
+        """
+        if subject_id is not None:
+            result = await self.session.execute(
+                select(Subject).where(Subject.id == subject_id)
+            )
+            subj = result.scalar_one_or_none()
+            if subj is None:
+                raise NotFoundError(f"Subject not found: {subject_id}")
+            return subj.id
+
+        # Default: resolve by slug.
+        result = await self.session.execute(
+            select(Subject).where(Subject.slug == "sistemas-operativos")
+        )
+        subj = result.scalar_one_or_none()
+        if subj is None:
+            # Create the default subject on-the-fly if missing
+            from app.models.subject import Subject as S
+
+            subj = S(name="Sistemas Operativos", slug="sistemas-operativos")
+            self.session.add(subj)
+            await self.session.flush()
+        return subj.id
+
     async def create_exam(
         self,
         partial_number: int,
         exam_date: date | None = None,
         topic_tags: str | None = None,
+        subject_id: int | None = None,
     ) -> Exam:
         """Create a new exam.
 
@@ -36,6 +73,7 @@ class ExamService:
             partial_number: Partial number (1-4)
             exam_date: Optional exam date
             topic_tags: Optional comma-separated topic tags
+            subject_id: Optional subject ID. Defaults to 'sistemas-operativos'.
 
         Returns:
             Created exam
@@ -43,6 +81,7 @@ class ExamService:
         Raises:
             ValidationError: If partial_number is invalid
             ConflictError: If duplicate exam exists
+            NotFoundError: If subject_id is provided but not found
         """
         # Validate partial number
         if partial_number not in [1, 2, 3, 4]:
@@ -68,11 +107,15 @@ class ExamService:
                     },
                 )
 
+        # Resolve subject_id (default to sistemas-operativos)
+        resolved_subject_id = await self._resolve_subject_id(subject_id)
+
         # Create exam
         exam = Exam(
             partial_number=partial_number,
             exam_date=exam_date,
             topic_tags=topic_tags,
+            subject_id=resolved_subject_id,
         )
 
         self.session.add(exam)
