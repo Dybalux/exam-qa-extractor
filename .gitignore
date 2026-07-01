@@ -73,3 +73,9 @@ alembic.ini.local
 
 # Local-only compose overrides
 docker-compose.observability.yml
+
+# Temporary scratch/utility scripts
+parse_engram.py
+save_verify_report.py
+engram-export.json
+database_backup_*.json
