@@ -12,7 +12,7 @@ from app.core.slug import slugify
 from app.dependencies import get_db
 from app.models.subject import Subject
 from app.models.topic import Topic
-from app.schemas.subject import SubjectCreate, SubjectResponse
+from app.schemas.subject import SubjectCreate, SubjectResponse, SubjectUpdate
 from app.schemas.topic import TopicCreate, TopicResponse
 
 router = APIRouter()
@@ -63,6 +63,75 @@ async def create_subject(
     await db.commit()
     await db.refresh(subject)
     return SubjectResponse.model_validate(subject)
+
+
+@router.put(
+    "/subjects/{subject_id}",
+    response_model=SubjectResponse,
+    tags=["subjects"],
+)
+async def update_subject(
+    subject_id: int,
+    payload: SubjectUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> SubjectResponse:
+    """Update a subject's name and/or slug."""
+    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    subject = result.scalar_one_or_none()
+    if subject is None:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    if payload.name is not None:
+        subject.name = payload.name.strip()
+        # Regenerate slug from new name if no explicit slug provided.
+        if payload.slug is None:
+            subject.slug = slugify(payload.name)
+    if payload.slug is not None:
+        # Check uniqueness only if slug changed.
+        if payload.slug != subject.slug:
+            existing = await db.execute(
+                select(Subject).where(Subject.slug == payload.slug)
+            )
+            if existing.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Subject with slug '{payload.slug}' already exists",
+                )
+            subject.slug = payload.slug
+
+    await db.commit()
+    await db.refresh(subject)
+    return SubjectResponse.model_validate(subject)
+
+
+@router.delete(
+    "/subjects/{subject_id}",
+    status_code=204,
+    tags=["subjects"],
+)
+async def delete_subject(
+    subject_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a subject. Topics are cascade-deleted.
+
+    Fails with 409 if the subject has exams (FK RESTRICT) or
+    if topics have questions linked to them.
+    """
+    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    subject = result.scalar_one_or_none()
+    if subject is None:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    try:
+        await db.delete(subject)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete subject: it has associated exams or questions.",
+        )
 
 
 # ── Topics ────────────────────────────────────────────────────

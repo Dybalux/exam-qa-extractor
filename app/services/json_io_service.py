@@ -337,7 +337,6 @@ class JsonIOService:
         Returns:
             The existing or newly-created Topic instance.
         """
-        from app.models.subject import Subject
         from app.models.topic import Topic
 
         if topic_slug in topics_map:
@@ -352,15 +351,11 @@ class JsonIOService:
         self._logger.info("dynamically created topic: %s", topic_slug)
         return topic
 
-    async def _resolve_default_subject(
-        self, slug: str = "sistemas-operativos"
-    ) -> "Subject":
+    async def _resolve_default_subject(self, slug: str = "sistemas-operativos"):
         """Return the default Subject, creating it if it does not exist."""
         from app.models.subject import Subject
 
-        result = await self.session.execute(
-            select(Subject).where(Subject.slug == slug)
-        )
+        result = await self.session.execute(select(Subject).where(Subject.slug == slug))
         subject = result.scalar_one_or_none()
         if subject is None:
             subject = Subject(name="Sistemas Operativos", slug=slug)

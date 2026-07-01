@@ -59,8 +59,6 @@ def _verify_backfill(table: str, column: str) -> None:
 
 def upgrade() -> None:
     """Drop topic column, enforce NOT NULL on FK columns."""
-    conn = op.get_bind()
-
     # -- Verify backfills before making destructive changes ----
     _verify_backfill("questions", "topic_id")
     _verify_backfill("exams", "subject_id")
@@ -87,8 +85,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Restore the topic column and relax NOT NULL constraints."""
-    conn = op.get_bind()
-
     # -- Relax NOT NULL constraints ----
     with op.batch_alter_table("questions", schema=None) as batch_op:
         batch_op.alter_column("topic_id", nullable=True)
@@ -100,7 +96,9 @@ def downgrade() -> None:
     if not _column_exists("questions", "topic"):
         with op.batch_alter_table("questions", recreate="always") as batch_op:
             batch_op.add_column(
-                sa.Column("topic", sa.String(50), nullable=False, server_default="other")
+                sa.Column(
+                    "topic", sa.String(50), nullable=False, server_default="other"
+                )
             )
 
     # -- Recreate idx_question_topic index ----

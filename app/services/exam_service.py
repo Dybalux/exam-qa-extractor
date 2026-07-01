@@ -53,9 +53,7 @@ class ExamService:
         subj = result.scalar_one_or_none()
         if subj is None:
             # Create the default subject on-the-fly if missing
-            from app.models.subject import Subject as S
-
-            subj = S(name="Sistemas Operativos", slug="sistemas-operativos")
+            subj = Subject(name="Sistemas Operativos", slug="sistemas-operativos")
             self.session.add(subj)
             await self.session.flush()
         return subj.id

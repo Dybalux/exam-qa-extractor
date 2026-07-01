@@ -12,6 +12,13 @@ class SubjectCreate(BaseModel):
     slug: str | None = None
 
 
+class SubjectUpdate(BaseModel):
+    """Payload to update a subject. At least one field must be provided."""
+
+    name: str | None = Field(None, min_length=1)
+    slug: str | None = None
+
+
 class SubjectResponse(BaseModel):
     """Full subject representation."""
 
