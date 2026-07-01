@@ -1,9 +1,10 @@
 """Question model for extracted exam questions."""
 
 import uuid as _uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import CheckConstraint, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import TopicEnum
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.exam import Exam
     from app.models.exam_image import ExamImage
     from app.models.practice_response import PracticeResponse
+    from app.models.topic import Topic
 
 
 class Question(Base):
@@ -29,6 +31,7 @@ class Question(Base):
         Index("idx_question_exam", "exam_id"),
         Index("idx_question_topic", "topic"),
         Index("idx_question_corrected", "is_corrected"),
+        Index("idx_question_topic_id", "topic_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -51,7 +54,12 @@ class Question(Base):
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    topic: Mapped[str] = mapped_column(
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    _topic: Mapped[str] = mapped_column(
+        "topic",
         String(50),
         default=TopicEnum.OTHER.value,
         nullable=False,
@@ -64,6 +72,10 @@ class Question(Base):
     # Relationships
     exam: Mapped["Exam"] = relationship(back_populates="questions")
     image: Mapped["ExamImage | None"] = relationship(back_populates="questions")
+    topic_relation: Mapped["Topic | None"] = relationship(
+        back_populates="questions",
+        lazy="selectin",
+    )
     answers: Mapped[list["Answer"]] = relationship(
         back_populates="question",
         cascade="all, delete-orphan",
@@ -74,6 +86,25 @@ class Question(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize Question and handle deprecated topic keyword argument."""
+        topic_val = kwargs.pop("topic", None)
+        super().__init__(**kwargs)
+        if topic_val is not None:
+            self.topic = topic_val  # type: ignore[method-assign]
+
+    @hybrid_property
+    def topic(self) -> str:
+        """Get the topic slug from the relation or fallback to the deprecated field."""
+        if self.topic_relation:
+            return self.topic_relation.slug
+        return self._topic
+
+    @topic.setter  # type: ignore[no-redef]
+    def topic(self, value: str) -> None:
+        """Set the topic value."""
+        self._topic = value
 
     def __repr__(self) -> str:
         return f"<Question(id={self.id}, exam_id={self.exam_id}, topic={self.topic})>"

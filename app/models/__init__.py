@@ -6,6 +6,8 @@ from app.models.exam_image import ExamImage
 from app.models.practice_response import PracticeResponse
 from app.models.practice_session import PracticeSession
 from app.models.question import Question
+from app.models.subject import Subject
+from app.models.topic import Topic
 
 __all__ = [
     "Answer",
@@ -14,4 +16,6 @@ __all__ = [
     "PracticeResponse",
     "PracticeSession",
     "Question",
+    "Subject",
+    "Topic",
 ]
