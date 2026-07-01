@@ -41,12 +41,12 @@
 
         <div class="form-group">
           <label class="form-label">Tema (opcional)</label>
-          <select name="topic" class="form-control">
-            <option value="">Todos</option>
-            {% for t in ['processes','memory','files','scheduling','deadlock','synchronization','io','security','other'] %}
-            <option value="{{ t }}">{{ t }}</option>
-            {% endfor %}
-          </select>
+           <select name="topic" class="form-control">
+             <option value="">Todos</option>
+             {% for t in topics %}
+             <option value="{{ t.slug }}">{{ t.name }}</option>
+             {% endfor %}
+           </select>
         </div>
       </div>
 

@@ -22,8 +22,8 @@
 
       <select name="topic" class="form-control" style="width:auto">
         <option value="">Todos los temas</option>
-        {% for t in ['processes','memory','files','scheduling','deadlock','synchronization','io','security','other'] %}
-        <option value="{{ t }}" {% if filters.topic == t %}selected{% endif %}>{{ t }}</option>
+        {% for t in topics %}
+        <option value="{{ t.slug }}" {% if filters.topic == t.slug %}selected{% endif %}>{{ t.name }}</option>
         {% endfor %}
       </select>
 

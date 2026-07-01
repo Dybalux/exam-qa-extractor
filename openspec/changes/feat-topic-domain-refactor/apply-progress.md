@@ -16,7 +16,13 @@
 - [x] 2.4 Refactor SearchService to join topics table
 - [x] 2.5 Refactor JsonIOService for topic pre-fetch + dynamic creation
 - [x] 2.6 Write integration tests in tests/test_topic_services.py (11 tests)
+- [x] 3.1 Create app/api/v1/endpoints/subjects.py with CRUD endpoints (7 endpoints)
+- [x] 3.2 Register subjects router in app/api/__init__.py
+- [x] 3.3 Refactor app/api/pages.py to query dynamic topics via get_all_topics dependency
+- [x] 3.4 Update templates (manual_form, questions/list, practice/start) for dynamic topics
+- [x] 3.5 Write integration tests in tests/api/test_subject_endpoints.py (17 tests)
 
 ## Status
-Phase 1 (9 tasks) + Phase 2 (6 tasks) all complete. All 106 tests pass, zero lint issues.
-Ready for Phase 3 (API & Pages).
+All phases complete: Phase 1 (9 tasks: foundation), Phase 2 (6 tasks: DB + services), Phase 3 (5 tasks: API + pages).
+123 tests pass, zero lint/format issues.
+Branch: feat/topic-domain-foundation (stacked-to-main, PR 3 of 3).
