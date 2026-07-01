@@ -1,0 +1,24 @@
+# Database seed definitions for subjects and topics.
+# Loaded by init_db.py on startup when subjects/topics tables are empty.
+subjects:
+  - name: "Sistemas Operativos"
+    slug: "sistemas-operativos"
+    topics:
+      - name: "Procesos"
+        slug: "processes"
+      - name: "Administración de Memoria"
+        slug: "memory"
+      - name: "Sistemas de Archivos"
+        slug: "files"
+      - name: "Planificación de CPU"
+        slug: "scheduling"
+      - name: "Deadlock"
+        slug: "deadlock"
+      - name: "Sincronización"
+        slug: "synchronization"
+      - name: "Entrada/Salida"
+        slug: "io"
+      - name: "Seguridad"
+        slug: "security"
+      - name: "Otros"
+        slug: "other"

@@ -6,10 +6,10 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import TopicEnum
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models.exam import Exam
 from app.models.question import Question
+from app.models.topic import Topic
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,38 @@ class QuestionService:
         """
         self.session = session
 
+    async def _resolve_topic_id(self, topic_slug: str) -> int:
+        """Resolve a topic slug to its database ID.
+
+        Args:
+            topic_slug: The topic slug (e.g. 'processes').
+
+        Returns:
+            The topic's primary key ID.
+
+        Raises:
+            ValidationError: If no Topic matches the given slug.
+        """
+        result = await self.session.execute(
+            select(Topic).where(Topic.slug == topic_slug)
+        )
+        topic = result.scalar_one_or_none()
+        if topic is None:
+            available = await self.session.execute(
+                select(Topic.slug).order_by(Topic.slug)
+            )
+            slugs = [row[0] for row in available.fetchall()]
+            raise ValidationError(
+                f"Invalid topic: {topic_slug}",
+                details={"valid_topics": slugs},
+            )
+        return topic.id
+
     async def create_question(
         self,
         exam_id: int,
         question_text: str,
-        topic: str = TopicEnum.OTHER.value,
+        topic: str = "other",
         order_in_exam: int | None = None,
         image_id: int | None = None,
         extracted_text: str | None = None,
@@ -40,7 +67,7 @@ class QuestionService:
         Args:
             exam_id: Exam ID
             question_text: Text of the question
-            topic: Topic classification
+            topic: Topic slug (resolved to topic_id dynamically).
             order_in_exam: Position in the exam (1-50)
             image_id: Optional source image ID
             extracted_text: Raw OCR-extracted text
@@ -51,7 +78,7 @@ class QuestionService:
 
         Raises:
             NotFoundError: If exam not found
-            ValidationError: If parameters are invalid
+            ValidationError: If parameters are invalid or topic slug unknown
         """
         result = await self.session.execute(select(Exam).where(Exam.id == exam_id))
         if not result.scalar_one_or_none():
@@ -60,22 +87,18 @@ class QuestionService:
         if not question_text.strip():
             raise ValidationError("question_text cannot be empty")
 
-        valid_topics = {t.value for t in TopicEnum}
-        if topic not in valid_topics:
-            raise ValidationError(
-                f"Invalid topic: {topic}",
-                details={"valid_topics": list(valid_topics)},
-            )
-
         if order_in_exam is not None and not (1 <= order_in_exam <= 50):
             raise ValidationError(
                 "order_in_exam must be between 1 and 50",
                 details={"order_in_exam": order_in_exam},
             )
 
+        topic_id = await self._resolve_topic_id(topic)
+
         question = Question(
             exam_id=exam_id,
             question_text=question_text.strip(),
+            topic_id=topic_id,
             topic=topic,
             order_in_exam=order_in_exam,
             image_id=image_id,
@@ -125,7 +148,7 @@ class QuestionService:
 
         Args:
             exam_id: Filter by exam ID
-            topic: Filter by topic
+            topic: Filter by topic slug (joined on topics table).
             is_corrected: Filter by correction status
             is_ready_for_practice: Filter by practice readiness (has correct answer)
 
@@ -138,7 +161,9 @@ class QuestionService:
             query = query.where(Question.exam_id == exam_id)
 
         if topic is not None:
-            query = query.where(Question.topic == topic)
+            query = query.join(Topic, Question.topic_id == Topic.id).where(
+                Topic.slug == topic
+            )
 
         if is_corrected is not None:
             query = query.where(Question.is_corrected == is_corrected)
@@ -194,12 +219,8 @@ class QuestionService:
             question.question_text = question_text.strip()
 
         if topic is not None:
-            valid_topics = {t.value for t in TopicEnum}
-            if topic not in valid_topics:
-                raise ValidationError(
-                    f"Invalid topic: {topic}",
-                    details={"valid_topics": list(valid_topics)},
-                )
+            topic_id = await self._resolve_topic_id(topic)
+            question.topic_id = topic_id
             question.topic = topic
 
         if order_in_exam is not None:
@@ -299,15 +320,27 @@ class QuestionService:
         if not result.scalar_one_or_none():
             raise NotFoundError(f"Exam not found: {exam_id}")
 
+        # Pre-fetch all topic slugs → ids to avoid N+1 lookups.
+        topic_rows = await self.session.execute(select(Topic.slug, Topic.id))
+        topic_map: dict[str, int] = {slug: tid for slug, tid in topic_rows.fetchall()}
+
         questions = []
         for i, data in enumerate(questions_data, start=1):
+            topic_slug = data.get("topic", "other")
+            topic_id = topic_map.get(topic_slug)
+            if topic_id is None:
+                raise ValidationError(
+                    f"Invalid topic: {topic_slug}",
+                    details={"valid_topics": list(topic_map.keys())},
+                )
             question = Question(
                 exam_id=exam_id,
                 image_id=image_id,
                 question_text=data.get("question_text", "").strip(),
                 extracted_text=data.get("extracted_text"),
                 confidence_score=data.get("confidence_score"),
-                topic=data.get("topic", TopicEnum.OTHER.value),
+                topic_id=topic_id,
+                topic=topic_slug,
                 order_in_exam=data.get("order_in_exam", i),
             )
             self.session.add(question)

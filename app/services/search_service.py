@@ -6,9 +6,10 @@ from typing import Sequence
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import CONFIDENCE_MEDIUM, TopicEnum
+from app.core.constants import CONFIDENCE_MEDIUM
 from app.models.exam import Exam
 from app.models.question import Question
+from app.models.topic import Topic
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,9 @@ class SearchService:
         )
 
         if topic is not None:
-            stmt = stmt.where(Question.topic == topic)
+            stmt = stmt.join(Topic, Question.topic_id == Topic.id).where(
+                Topic.slug == topic
+            )
 
         if exam_id is not None:
             stmt = stmt.where(Question.exam_id == exam_id)
@@ -138,7 +141,9 @@ class SearchService:
             stmt = stmt.where(Question.exam_id == exam_id)
 
         if topic is not None:
-            stmt = stmt.where(Question.topic == topic)
+            stmt = stmt.join(Topic, Question.topic_id == Topic.id).where(
+                Topic.slug == topic
+            )
 
         stmt = stmt.order_by(
             Question.exam_id.asc(), Question.order_in_exam.asc().nullslast()
@@ -161,22 +166,30 @@ class SearchService:
         """Get all questions for a given topic across all exams.
 
         Args:
-            topic: Topic value from TopicEnum
+            topic: Topic slug (e.g. 'processes').
             limit: Maximum results
 
         Returns:
             Questions matching the topic
 
         Raises:
-            ValueError: If topic is not a valid TopicEnum value
+            ValueError: If topic slug does not match any Topic record.
         """
-        valid_topics = {t.value for t in TopicEnum}
-        if topic not in valid_topics:
-            raise ValueError(f"Invalid topic: {topic}. Valid: {sorted(valid_topics)}")
+        # Resolve topic by slug.
+        topic_result = await self.session.execute(
+            select(Topic.id).where(Topic.slug == topic)
+        )
+        topic_id = topic_result.scalar_one_or_none()
+        if topic_id is None:
+            slugs_result = await self.session.execute(
+                select(Topic.slug).order_by(Topic.slug)
+            )
+            valid = sorted(row[0] for row in slugs_result.fetchall())
+            raise ValueError(f"Invalid topic: {topic}. Valid: {valid}")
 
         result = await self.session.execute(
             select(Question)
-            .where(Question.topic == topic)
+            .where(Question.topic_id == topic_id)
             .order_by(Question.exam_id.asc(), Question.order_in_exam.asc().nullslast())
             .limit(limit)
         )
