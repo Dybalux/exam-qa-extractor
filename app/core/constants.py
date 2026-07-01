@@ -3,6 +3,10 @@
 from enum import Enum
 
 
+# DEPRECATED — Use the dynamic Topic database table instead.
+# Kept for backward compatibility with legacy code that may still
+# reference the enum values.  New code MUST resolve topics via the
+# Topic model in ``app.models.topic``.
 class TopicEnum(str, Enum):
     """Operating Systems topics for question classification."""
 

@@ -4,15 +4,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.constants import TopicEnum
-
 
 class QuestionCreate(BaseModel):
     """Payload to create a question manually."""
 
     exam_id: int
     question_text: str = Field(..., min_length=1)
-    topic: str = Field(default=TopicEnum.OTHER.value)
+    topic: str = Field(default="other")
     order_in_exam: int | None = Field(None, ge=1, le=50)
     image_id: int | None = None
     extracted_text: str | None = None
@@ -43,7 +41,7 @@ class BulkQuestionItem(BaseModel):
     question_text: str = Field(..., min_length=1)
     extracted_text: str | None = None
     confidence_score: float | None = Field(None, ge=0.0, le=100.0)
-    topic: str = TopicEnum.OTHER.value
+    topic: str = "other"
     order_in_exam: int | None = None
 
 

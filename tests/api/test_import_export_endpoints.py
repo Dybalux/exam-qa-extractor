@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # ``Base.metadata.create_all``. (The conftest also imports them, but
 # the explicit import here is the standard contract for the tests
 # that exercise the DB via ``db_session``.)
-from app.core.constants import AnswerType, TopicEnum  # noqa: F401
+from app.core.constants import AnswerType  # noqa: F401
 from app.models.answer import Answer  # noqa: F401
 from app.models.exam import Exam  # noqa: F401
 from app.models.question import Question  # noqa: F401
@@ -126,7 +126,7 @@ async def test_export_endpoint_populated_db(
         exam_id=exam.id,
         question_text="What is 2 + 2?",
         extracted_text="2 + 2",
-        topic=TopicEnum.OTHER.value,
+        topic="other",
         order_in_exam=1,
     )
     db_session.add(question)

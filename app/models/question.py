@@ -7,7 +7,6 @@ from sqlalchemy import CheckConstraint, Float, ForeignKey, Index, Integer, Strin
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import TopicEnum
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -61,7 +60,7 @@ class Question(Base):
     _topic: Mapped[str] = mapped_column(
         "topic",
         String(50),
-        default=TopicEnum.OTHER.value,
+        default="other",
         nullable=False,
     )
     order_in_exam: Mapped[int | None] = mapped_column(Integer, nullable=True)
