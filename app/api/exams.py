@@ -246,9 +246,7 @@ async def upload_exam_image(
             return redirect_with_flash(default_url, message)
         else:
             message = "No se pudieron extraer preguntas del archivo."
-            return redirect_with_flash(
-                f"/exams/{exam_id}/upload", message, "warning"
-            )
+            return redirect_with_flash(f"/exams/{exam_id}/upload", message, "warning")
 
     except FileValidationError as e:
         logger.warning(f"File validation failed: {e}")

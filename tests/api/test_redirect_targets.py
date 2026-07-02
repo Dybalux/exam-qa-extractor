@@ -4,15 +4,12 @@ Covers SDD change ``fix-exam-list-and-edit-navigation`` tasks 5.1–5.3.
 """
 
 import urllib.parse
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.responses import RedirectResponse
 from httpx import AsyncClient
 
-
 # ── 5.1 redirect_with_flash URL-encoding ─────────────────────
-
 from app.api._flash import redirect_with_flash
 
 
@@ -143,9 +140,6 @@ async def test_exam_edit_submit_redirects_to_list_with_flash(
     assert list_resp.status_code == 200
 
     # Create via API instead to get a real ID.
-    from app.dependencies import get_exam_service
-    from app.main import app
-    from app.services.exam_service import ExamService
 
     # Use the dependency override to create an exam via service.
     # More direct: post and check.
@@ -172,7 +166,8 @@ async def test_exam_edit_submit_redirects_to_list_with_flash(
 
 @pytest.mark.asyncio
 async def test_manual_question_create_redirects_to_question_list(
-    client: AsyncClient, default_subject,
+    client: AsyncClient,
+    default_subject,
 ):
     """POST /exams/{id}/questions/new → 303 redirect to /questions."""
     # default_subject seeds the 'other' topic needed by the handler.
@@ -202,7 +197,8 @@ async def test_manual_question_create_redirects_to_question_list(
 
 @pytest.mark.asyncio
 async def test_ocr_correction_redirects_to_question_list(
-    client: AsyncClient, default_subject,
+    client: AsyncClient,
+    default_subject,
 ):
     """POST /questions/{id}/correct → 303 redirect to /questions."""
     _ = default_subject
@@ -224,10 +220,7 @@ async def test_ocr_correction_redirects_to_question_list(
     )
     assert q_create.status_code == 303
 
-    # Find the created question ID from the list.
-    list_resp = await client.get("/questions")
-    # We need the question ID — parse from HTML or use API.
-    # Use the questions API to find it.
+    # Find the created question ID via the API.
     api_q_resp = await client.get("/api/v1/questions/?exam_id=" + str(exam_id))
     questions = api_q_resp.json()
     assert len(questions) > 0

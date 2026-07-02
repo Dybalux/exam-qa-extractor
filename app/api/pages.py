@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.api._flash import redirect_with_flash
 from app.core.exceptions import NotFoundError
 from app.dependencies import (
     get_all_topics,
@@ -25,8 +26,6 @@ from app.services.exam_service import ExamService
 from app.services.practice_service import PracticeService
 from app.services.question_service import QuestionService
 from app.services.search_service import SearchService
-
-from app.api._flash import redirect_with_flash
 
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
@@ -135,7 +134,7 @@ async def exam_create(
         from datetime import date
 
         exam_date = date.fromisoformat(exam_date_str)
-    exam = await service.create_exam(
+    await service.create_exam(
         partial_number=partial_number, exam_date=exam_date, topic_tags=topic_tags
     )
     return redirect_with_flash("/exams", "Examen guardado")
@@ -324,9 +323,7 @@ async def question_correct_submit(
     await service.correct_ocr_text(
         question_id=question_id, corrected_text=corrected_text, notes=notes
     )
-    return redirect_with_flash(
-        "/questions", "Corrección guardada"
-    )
+    return redirect_with_flash("/questions", "Corrección guardada")
 
 
 @router.get("/exams/{exam_id}/upload", response_class=HTMLResponse)
