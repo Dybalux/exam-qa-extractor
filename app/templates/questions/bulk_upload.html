@@ -3,13 +3,13 @@
 {% block page_title %}Subir imagen de examen{% endblock %}
 {% block page_subtitle %}<p class="page-subtitle">Parcial {{ exam.partial_number }} · El OCR extraerá las preguntas automáticamente</p>{% endblock %}
 {% block page_actions %}
-  <a href="/exams/{{ exam.id }}" class="btn btn-ghost">← Volver al examen</a>
+  <a href="/exams/{{ exam.id }}" class="btn btn-ghost" data-cancel-for="bulk-upload-form">← Volver al examen</a>
 {% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:560px">
+<div class="card form-card">
   <div class="card-body">
-    <form method="POST" action="/api/v1/exams/{{ exam.id }}/upload" enctype="multipart/form-data">
+    <form method="POST" action="/api/v1/exams/{{ exam.id }}/upload" enctype="multipart/form-data" id="bulk-upload-form" data-track-dirty>
       <div class="form-group">
         <label class="form-label">Imagen del examen *</label>
         <div id="drop-zone" style="border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px; text-align:center; cursor:pointer; transition:border-color var(--t); background:var(--bg-base); position:relative; overflow:hidden">
@@ -30,6 +30,8 @@
           <option value="spa+eng">Español + Inglés</option>
         </select>
       </div>
+
+      <input type="hidden" name="return_to" value="{{ request.query_params.get('return_to', '') }}">
 
       <div class="alert alert-info">
         ℹ Después del procesamiento OCR, revisá y corregí las preguntas extraídas desde

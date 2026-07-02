@@ -16,7 +16,7 @@
   <div class="card-body">
     {% if answers %}
     <form method="POST" action="/api/v1/answers/question/{{ question.id }}/reorder"
-          id="reorder-form">
+          id="reorder-form" data-question-id="{{ question.id }}">
       <input type="hidden" id="ordered-ids" name="ordered_ids" value="">
       <ul id="answer-reorder-list" style="display:flex; flex-direction:column; gap:8px">
         {% for answer in answers %}

@@ -33,7 +33,7 @@ Chain strategy: pending
 
 - [ ] 1.3 Hoist `showToast`, `escapeHtml`, and `toastContainer` out of the delete-modal IIFE in `app/static/js/app.js` to global scope (attach to `window`). Keep existing IIFE functional. *(Design decision 9)* ~20 lines, medium risk (refactor of existing code)
 
-- [ ] 1.4 Add `.form-card` centering rule inside `@media (min-width: 1024px)` in `app/static/css/styles.css`: `.form-card { max-width: 520px; margin-inline: auto; }`. *(Design decision 8, spec: DESKTOP FORM CENTERING)* ~5 lines, low risk
+- [x] 1.4 Add `.form-card` centering rule inside `@media (min-width: 1024px)` in `app/static/css/styles.css`: `.form-card { max-width: 520px; margin-inline: auto; }`. *(Design decision 8, spec: DESKTOP FORM CENTERING)* ~5 lines, low risk
 
 ## Phase 2: Backend Redirect Targets
 
@@ -51,17 +51,17 @@ Chain strategy: pending
 
 ## Phase 3: Template Changes (Cancel Links + CSS + Dirty Attrs)
 
-- [ ] 3.1 `app/templates/exams/form.html`: (a) Header cancel (line 5): change href `{{ '/exams/' + exam.id|string if exam else '/exams' }}` → `/exams`, add `data-cancel-for="exam-form"`. (b) In-form Cancel (line 40): same href change → `/exams`. (c) Add `form-card` to wrapping `<div class="card">` (line 9 → `<div class="card form-card">`). (d) Remove inline `style="max-width:520px"` from wrapping div. (e) Add `id="exam-form"` and `data-track-dirty` to `<form>`. *(Design decision 2+3+8, spec: CANCEL LINK)* ~6 lines, low risk
+- [x] 3.1 `app/templates/exams/form.html`: (a) Header cancel (line 5): change href `{{ '/exams/' + exam.id|string if exam else '/exams' }}` → `/exams`, add `data-cancel-for="exam-form"`. (b) In-form Cancel (line 40): same href change → `/exams`. (c) Add `form-card` to wrapping `<div class="card">` (line 9 → `<div class="card form-card">`). (d) Remove inline `style="max-width:520px"` from wrapping div. (e) Add `id="exam-form"` and `data-track-dirty` to `<form>`. *(Design decision 2+3+8, spec: CANCEL LINK)* ~6 lines, low risk
 
-- [ ] 3.2 `app/templates/questions/manual_form.html`: (a) Header cancel (line 6): `/exams/{{ exam.id }}` → `/questions`, add `data-cancel-for="manual-question-form"`. (b) In-form Cancel (line 68): same href change → `/questions`. (c) Add `data-track-dirty` to form (reuse existing `id="manual-question-form"` at line 15 — do NOT duplicate). *(Design decision 2+3, spec: CANCEL LINK)* ~4 lines, low risk
+- [x] 3.2 `app/templates/questions/manual_form.html`: (a) Header cancel (line 6): `/exams/{{ exam.id }}` → `/questions`, add `data-cancel-for="manual-question-form"`. (b) In-form Cancel (line 68): same href change → `/questions`. (c) Add `data-track-dirty` to form (reuse existing `id="manual-question-form"` at line 15 — do NOT duplicate). *(Design decision 2+3, spec: CANCEL LINK)* ~4 lines, low risk
 
-- [ ] 3.3 `app/templates/questions/correct.html`: (a) Header cancel (line 6): `javascript:history.back()` → `/questions`, add `data-cancel-for`. (b) In-form Cancel (line 48): same change → `/questions`. (c) Add `data-track-dirty` + `id` to form. *(Design decision 2+3, spec: CANCEL LINK)* ~4 lines, low risk
+- [x] 3.3 `app/templates/questions/correct.html`: (a) Header cancel (line 6): `javascript:history.back()` → `/questions`, add `data-cancel-for`. (b) In-form Cancel (line 48): same change → `/questions`. (c) Add `data-track-dirty` + `id` to form. *(Design decision 2+3, spec: CANCEL LINK)* ~4 lines, low risk
 
-- [ ] 3.4 `app/templates/answers/form.html`: (a) Header cancel (line 6): href unchanged (`/questions/{{ question.id }}` is correct) + add `data-cancel-for`. (b) In-form Cancel (line 48): unchanged. (c) Add `form-card` to wrapping `<div class="card">` (line 10 → `<div class="card form-card">`). (d) Remove inline `style="max-width:560px"` from wrapping div. (e) Add `data-track-dirty` + `id` to form. *(Design decision 2+3+8, spec: CANCEL LINK)* ~5 lines, low risk
+- [x] 3.4 `app/templates/answers/form.html`: (a) Header cancel (line 6): href unchanged (`/questions/{{ question.id }}` is correct) + add `data-cancel-for`. (b) In-form Cancel (line 48): unchanged. (c) Add `form-card` to wrapping `<div class="card">` (line 10 → `<div class="card form-card">`). (d) Remove inline `style="max-width:560px"` from wrapping div. (e) Add `data-track-dirty` + `id` to form. *(Design decision 2+3+8, spec: CANCEL LINK)* ~5 lines, low risk
 
-- [ ] 3.5 `app/templates/questions/bulk_upload.html`: (a) Header cancel (line 6): add `data-cancel-for="bulk-upload-form"`. (b) Add `form-card` to wrapping `<div class="card">` (line 10 → `<div class="card form-card">`). (c) Remove inline `style="max-width:560px"` from wrapping div. (d) Add `id="bulk-upload-form"` and `data-track-dirty` to form (line 12). (e) Add hidden `<input type="hidden" name="return_to" value="{{ request.query_params.get('return_to', '') }}">`. **Note**: the GET handler `bulk_upload_page` must pass `return_to` from query params to template context, or this hidden input is dead code. *(Design decision 6, spec: Image upload preserves return_to)* ~6 lines, medium risk
+- [x] 3.5 `app/templates/questions/bulk_upload.html`: (a) Header cancel (line 6): add `data-cancel-for="bulk-upload-form"`. (b) Add `form-card` to wrapping `<div class="card">` (line 10 → `<div class="card form-card">`). (c) Remove inline `style="max-width:560px"` from wrapping div. (d) Add `id="bulk-upload-form"` and `data-track-dirty` to form (line 12). (e) Add hidden `<input type="hidden" name="return_to" value="{{ request.query_params.get('return_to', '') }}">`. **Note**: the GET handler `bulk_upload_page` must pass `return_to` from query params to template context, or this hidden input is dead code. *(Design decision 6, spec: Image upload preserves return_to)* ~6 lines, medium risk
 
-- [ ] 3.6 `app/templates/base.html`: Add `#unsaved-modal` markup after `#delete-modal` (line 133), reusing `.modal` CSS patterns. Include `aria-modal="true"`, `role="dialog"`, backdrop, close button, 3 action buttons ("Guardar y salir", "Descartar", "Cancelar"). *(Design decision 4, spec: UNSAVED CHANGES GUARD)* ~30 lines, low risk
+- [x] 3.6 `app/templates/base.html`: Add `#unsaved-modal` markup after `#delete-modal` (line 133), reusing `.modal` CSS patterns. Include `aria-modal="true"`, `role="dialog"`, backdrop, close button, 3 action buttons ("Guardar y salir", "Descartar", "Cancelar"). *(Design decision 4, spec: UNSAVED CHANGES GUARD)* ~30 lines, low risk
 
 ## Phase 4: JavaScript — Dirty Tracking + Modal + Reorder
 

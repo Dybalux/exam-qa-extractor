@@ -3,7 +3,7 @@
 {% block page_title %}Corregir texto OCR{% endblock %}
 {% block page_subtitle %}<p class="page-subtitle">Pregunta #{{ question.id }} · Examen #{{ question.exam_id }}</p>{% endblock %}
 {% block page_actions %}
-  <a href="javascript:history.back()" class="btn btn-ghost">← Volver atrás</a>
+  <a href="/questions" class="btn btn-ghost" data-cancel-for="correct-form">← Cancelar</a>
 {% endblock %}
 
 {% block content %}
@@ -27,7 +27,7 @@
   <div class="card">
     <div class="card-header"><h3 class="card-title">Texto corregido</h3></div>
     <div class="card-body">
-      <form method="POST" action="/questions/{{ question.id }}/correct">
+      <form method="POST" action="/questions/{{ question.id }}/correct" id="correct-form" data-track-dirty>
         <div class="form-group">
           <label class="form-label">Texto corregido *</label>
           <textarea name="corrected_text" class="form-control" rows="8" required
@@ -45,7 +45,7 @@
 
         <div class="flex gap-3">
           <button type="submit" class="btn btn-success">✓ Guardar corrección</button>
-          <a href="javascript:history.back()" class="btn btn-ghost">Cancelar</a>
+          <a href="/questions" class="btn btn-ghost">Cancelar</a>
         </div>
       </form>
     </div>

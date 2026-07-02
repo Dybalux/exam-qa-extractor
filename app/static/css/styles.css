@@ -80,6 +80,7 @@ code, pre { font-family: 'JetBrains Mono', monospace; font-size: 0.875em; }
   .main-content { margin-left: var(--sidebar-w); }
   .page-header { padding: 24px 32px 20px; }
   .page-body { padding: 24px 32px; }
+  .form-card { max-width: 520px; margin-inline: auto; }
 }
 
 /* Cards */

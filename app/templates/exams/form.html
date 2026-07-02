@@ -2,13 +2,13 @@
 {% block title %}{{ 'Editar' if exam else 'Nuevo' }} Examen — ExamOCR{% endblock %}
 {% block page_title %}{{ 'Editar examen' if exam else 'Nuevo examen' }}{% endblock %}
 {% block page_actions %}
-  <a href="{{ '/exams/' + exam.id|string if exam else '/exams' }}" class="btn btn-ghost">← Cancelar</a>
+  <a href="/exams" class="btn btn-ghost" data-cancel-for="exam-form">← Cancelar</a>
 {% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:520px">
+<div class="card form-card">
   <div class="card-body">
-    <form method="POST" action="{{ '/exams/' + exam.id|string + '/edit' if exam else '/exams/new' }}">
+    <form method="POST" action="{{ '/exams/' + exam.id|string + '/edit' if exam else '/exams/new' }}" id="exam-form" data-track-dirty>
       <div class="form-group">
         <label class="form-label">Número de parcial *</label>
         <select name="partial_number" class="form-control" required>
@@ -37,7 +37,7 @@
         <button type="submit" class="btn btn-primary">
           {{ '💾 Guardar cambios' if exam else '+ Crear examen' }}
         </button>
-        <a href="{{ '/exams/' + exam.id|string if exam else '/exams' }}" class="btn btn-ghost">Cancelar</a>
+        <a href="/exams" class="btn btn-ghost">Cancelar</a>
       </div>
     </form>
   </div>

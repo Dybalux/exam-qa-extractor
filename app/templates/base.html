@@ -132,6 +132,25 @@
   </div>
 </div>
 
+<!-- Unsaved Changes Modal -->
+<div id="unsaved-modal" class="modal" role="dialog" aria-labelledby="unsaved-modal-title" aria-modal="true" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="unsaved-modal-title">¿Salir sin guardar?</h3>
+      <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>Tenés cambios sin guardar. ¿Qué querés hacer?</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" data-modal-close>Cancelar</button>
+      <button type="button" class="btn btn-ghost" id="unsaved-discard">Descartar</button>
+      <button type="button" class="btn btn-primary" id="unsaved-save">Guardar y salir</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
