@@ -231,8 +231,23 @@ function showToast(type, message) {
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
 
-    // Focus management
-    confirmBtn.focus();
+    // Focus management: a disabled button is not focusable, so .focus()
+    // would be a no-op and activeElement would stay on the trigger
+    // (outside the modal), leaving the focus trap inert. When the
+    // confirm button is disabled, focus the close button instead so
+    // focus lands inside the modal and the trap engages.
+    if (confirmBtn.disabled) {
+      var closeBtn = modal.querySelector('button[data-modal-close]');
+      if (closeBtn) {
+        closeBtn.focus();
+      } else {
+        // Fallback: focus the modal container itself.
+        modal.setAttribute('tabindex', '-1');
+        modal.focus();
+      }
+    } else {
+      confirmBtn.focus();
+    }
   }
 
   /**
@@ -486,8 +501,6 @@ function showToast(type, message) {
   document.addEventListener('click', function (e) {
     var link = e.target.closest('a');
     if (!link) return;
-    // Don't intercept submit buttons disguised as links.
-    if (link.type === 'submit') return;
 
     if (isCancelClick(link)) {
       e.preventDefault();
@@ -530,13 +543,20 @@ function showToast(type, message) {
     unsavedState = null;
   }
 
-  // "Guardar y salir" — submit the form natively.
+  // "Guardar y salir" — submit the form natively. Hide the modal so the
+  // form (and any native validation bubble on an invalid field) is visible,
+  // but do NOT restore focus to the trigger: on validation failure the
+  // browser must keep focus on the invalid field; on success the page
+  // navigates away and focus is moot.
   if (unsavedSaveBtn) {
     unsavedSaveBtn.addEventListener('click', function () {
-      if (unsavedState && unsavedState.form) {
-        unsavedState.form.submit();
+      var form = unsavedState && unsavedState.form;
+      unsavedModal.hidden = true;
+      document.body.style.overflow = '';
+      unsavedState = null;
+      if (form) {
+        form.requestSubmit();
       }
-      closeUnsavedModal();
     });
   }
 
@@ -626,6 +646,15 @@ function showToast(type, message) {
     if (focusable.length === 0) return;
     var first = focusable[0];
     var last = focusable[focusable.length - 1];
+
+    // If focus escaped the modal (e.g. the user clicked a non-focusable
+    // element like the modal body <p>, moving activeElement to <body>),
+    // pull it back inside before applying edge-wrap logic.
+    if (!modal.contains(document.activeElement)) {
+      e.preventDefault();
+      first.focus();
+      return;
+    }
 
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();

@@ -54,9 +54,11 @@ async def test_upload_exam_image_with_invalid_return_to_uses_default(
 ):
     """When return_to is an absolute or unknown URL, the default is used.
 
-    We test the validation logic directly via the helper, since triggering
-    a real file upload + OCR is complex.  The endpoint behaviour (success
-    path with valid return_to) is tested via the integration test below.
+    This test exercises the ``_validate_return_to`` helper directly
+    (rejecting absolute/unknown paths and accepting allowlist entries).
+    The endpoint behaviour — success redirect with a valid ``return_to``
+    form field and the default fallback when absent — is covered by the
+    dedicated ``test_upload_exam_image_*`` endpoint tests below.
     """
     from app.api.exams import _validate_return_to
 
@@ -125,25 +127,7 @@ async def test_exam_edit_submit_redirects_to_list_with_flash(
     Before this change, the handler returned a bare RedirectResponse
     with NO flash.  After the change, it must include a flash message.
     """
-    # Create an exam first.
-    create_resp = await client.post(
-        "/exams/new",
-        data={"partial_number": "1", "topic_tags": "test"},
-        follow_redirects=False,
-    )
-    assert create_resp.status_code == 303
-    # Extract exam_id from redirect URL (format: /exams?id=<id>&...)
-    # Actually, the redirect now goes to /exams, not /exams/{id}.
-    # We need to create an exam and find its ID.
-    # Simpler: use the API endpoint to list exams.
-    list_resp = await client.get("/exams")
-    assert list_resp.status_code == 200
-
-    # Create via API instead to get a real ID.
-
-    # Use the dependency override to create an exam via service.
-    # More direct: post and check.
-    # Actually, let's just use the REST API to create and edit.
+    # Create an exam via the API to get a real ID.
     api_create = await client.post(
         "/api/v1/exams/",
         json={"partial_number": 2, "topic_tags": "memoria"},
@@ -236,4 +220,202 @@ async def test_ocr_correction_redirects_to_question_list(
     location = response.headers["location"]
     assert location.startswith("/questions?")
     decoded = urllib.parse.unquote(location)
-    assert "Correcci%C3%B3n+guardada" in location or "Correcci" in decoded
+    assert "Corrección guardada" in decoded
+
+
+@pytest.mark.asyncio
+async def test_answer_create_redirects_to_parent_question(
+    client: AsyncClient,
+    default_subject,
+):
+    """POST answer create/edit → 303 redirect to /questions/{qid} (parent detail).
+
+    Covers the spec scenario "Answer create/edit redirects to parent
+    question detail" — pages.py answer_create (line ~503) and
+    answer_update (line ~556).
+    """
+    _ = default_subject  # seeds the 'other' topic needed by the handler
+    # Create an exam + question.
+    api_create = await client.post(
+        "/api/v1/exams/",
+        json={"partial_number": 1, "topic_tags": "test"},
+    )
+    exam_id = api_create.json()["id"]
+
+    q_create = await client.post(
+        f"/exams/{exam_id}/questions/new",
+        data={
+            "question_text": "¿Qué es la memoria virtual?",
+            "topic": "other",
+            "correct_answer_text": "Técnica de gestión de memoria.",
+        },
+        follow_redirects=False,
+    )
+    assert q_create.status_code == 303
+
+    api_q_resp = await client.get("/api/v1/questions/?exam_id=" + str(exam_id))
+    question_id = api_q_resp.json()[0]["id"]
+
+    # Create answer via form → redirect to /questions/{qid}.
+    create_resp = await client.post(
+        f"/questions/{question_id}/answers/new",
+        data={
+            "answer_text": "Área de almacenamiento temporal.",
+            "answer_type": "incorrect",
+        },
+        follow_redirects=False,
+    )
+    assert create_resp.status_code == 303
+    location = create_resp.headers["location"]
+    assert location.startswith(f"/questions/{question_id}?")
+    decoded = urllib.parse.unquote(location)
+    assert "Respuesta agregada correctamente" in decoded
+
+    # Find the created answer ID via the API.
+    api_a_resp = await client.get(f"/api/v1/answers/question/{question_id}")
+    answer_id = api_a_resp.json()[0]["id"]
+
+    # Edit answer via form → redirect to /questions/{qid}.
+    edit_resp = await client.post(
+        f"/questions/{question_id}/answers/{answer_id}/edit",
+        data={
+            "answer_text": "Área de almacenamiento temporal corregida.",
+            "answer_type": "correct",
+        },
+        follow_redirects=False,
+    )
+    assert edit_resp.status_code == 303
+    location = edit_resp.headers["location"]
+    assert location.startswith(f"/questions/{question_id}?")
+    decoded = urllib.parse.unquote(location)
+    assert "Respuesta actualizada correctamente" in decoded
+
+
+# ── 5.2b Upload endpoint return_to (success-path override) ────
+
+
+@pytest.mark.asyncio
+async def test_upload_exam_image_with_valid_return_to_redirects_to_return_to(
+    client: AsyncClient,
+    default_subject,
+):
+    """POST /api/v1/exams/{id}/upload with valid return_to → 303 to return_to.
+
+    The success-path override fires: the redirect targets the validated
+    return_to path (pinned exam_id), not the default review queue.
+    OCR and storage are mocked at the dependency boundary.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.dependencies import get_ocr_service, get_storage_service
+    from app.main import app
+    from app.services.ocr_service import ExtractedQuestion, OCRResult
+
+    _ = default_subject  # seeds 'other' topic used by the endpoint
+    api_create = await client.post(
+        "/api/v1/exams/",
+        json={"partial_number": 2, "topic_tags": "test"},
+    )
+    exam_id = api_create.json()["id"]
+
+    # Mock storage + OCR at the dependency boundary.
+    storage_mock = MagicMock()
+    upload_result_mock = MagicMock()
+    upload_result_mock.absolute_path = "/tmp/test-upload.png"
+    storage_mock.save_file = AsyncMock(return_value=upload_result_mock)
+
+    ocr_mock = MagicMock()
+    ocr_mock.process_image = AsyncMock(
+        return_value=OCRResult(
+            full_text="¿Pregunta?",
+            questions=[
+                ExtractedQuestion(
+                    order=1, text="¿Pregunta?", confidence=50.0, requires_review=True
+                )
+            ],
+            has_code=False,
+            average_confidence=50.0,
+        )
+    )
+
+    app.dependency_overrides[get_storage_service] = lambda: storage_mock
+    app.dependency_overrides[get_ocr_service] = lambda: ocr_mock
+    try:
+        response = await client.post(
+            f"/api/v1/exams/{exam_id}/upload",
+            files={"file": ("test.png", b"fake-image-data", "image/png")},
+            data={"language": "spa", "return_to": f"/exams/{exam_id}"},
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(get_storage_service, None)
+        app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 303
+    location = response.headers["location"]
+    # return_to /exams/{id} is validated + pinned: /exams/{exam_id}?exam_id={exam_id}
+    assert location.startswith(f"/exams/{exam_id}?")
+    assert "exam_id=" in location
+
+
+@pytest.mark.asyncio
+async def test_upload_exam_image_without_return_to_uses_default_redirect(
+    client: AsyncClient,
+    default_subject,
+):
+    """POST /api/v1/exams/{id}/upload without return_to → 303 to default.
+
+    With no return_to, the default redirect fires (review queue when
+    questions need review). OCR and storage are mocked at the dependency
+    boundary.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.dependencies import get_ocr_service, get_storage_service
+    from app.main import app
+    from app.services.ocr_service import ExtractedQuestion, OCRResult
+
+    _ = default_subject
+    api_create = await client.post(
+        "/api/v1/exams/",
+        json={"partial_number": 3, "topic_tags": "test"},
+    )
+    exam_id = api_create.json()["id"]
+
+    storage_mock = MagicMock()
+    upload_result_mock = MagicMock()
+    upload_result_mock.absolute_path = "/tmp/test-upload.png"
+    storage_mock.save_file = AsyncMock(return_value=upload_result_mock)
+
+    ocr_mock = MagicMock()
+    ocr_mock.process_image = AsyncMock(
+        return_value=OCRResult(
+            full_text="¿Pregunta?",
+            questions=[
+                ExtractedQuestion(
+                    order=1, text="¿Pregunta?", confidence=50.0, requires_review=True
+                )
+            ],
+            has_code=False,
+            average_confidence=50.0,
+        )
+    )
+
+    app.dependency_overrides[get_storage_service] = lambda: storage_mock
+    app.dependency_overrides[get_ocr_service] = lambda: ocr_mock
+    try:
+        response = await client.post(
+            f"/api/v1/exams/{exam_id}/upload",
+            files={"file": ("test.png", b"fake-image-data", "image/png")},
+            data={"language": "spa"},
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(get_storage_service, None)
+        app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 303
+    location = response.headers["location"]
+    # Default: review queue (questions need review).
+    assert location.startswith("/search/needs-review?")
+    assert f"exam_id={exam_id}" in location
