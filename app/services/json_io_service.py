@@ -664,16 +664,16 @@ class JsonIOService:
             }
             for json_q in parsed_questions:
                 ec = json_q.exam_context
-                existing = exam_map.get(ec.uuid)
-                if existing is not None:
+                existing_exam = exam_map.get(ec.uuid)
+                if existing_exam is not None:
                     if (
-                        existing.partial_number != ec.partial_number
-                        or existing.exam_date != ec.exam_date
-                        or existing.topic_tags != ec.topic_tags
+                        existing_exam.partial_number != ec.partial_number
+                        or existing_exam.exam_date != ec.exam_date
+                        or existing_exam.topic_tags != ec.topic_tags
                     ):
-                        existing.partial_number = ec.partial_number
-                        existing.exam_date = ec.exam_date
-                        existing.topic_tags = ec.topic_tags
+                        existing_exam.partial_number = ec.partial_number
+                        existing_exam.exam_date = ec.exam_date
+                        existing_exam.topic_tags = ec.topic_tags
                         updated += 1
                 else:
                     new_exam = Exam(
@@ -742,16 +742,16 @@ class JsonIOService:
             for json_q in parsed_questions:
                 parent_q = question_map[json_q.uuid]
                 for json_a in json_q.answers:
-                    existing = db_answer_by_uuid.get(json_a.uuid)
-                    if existing is not None:
-                        if not self._answer_matches_db(json_a, existing):
-                            existing.answer_text = json_a.answer_text
-                            existing.answer_type = json_a.answer_type
-                            existing.is_common_misconception = (
+                    existing_a = db_answer_by_uuid.get(json_a.uuid)
+                    if existing_a is not None:
+                        if not self._answer_matches_db(json_a, existing_a):
+                            existing_a.answer_text = json_a.answer_text
+                            existing_a.answer_type = json_a.answer_type
+                            existing_a.is_common_misconception = (
                                 json_a.is_common_misconception
                             )
-                            existing.explanation = json_a.explanation
-                            existing.display_order = json_a.display_order
+                            existing_a.explanation = json_a.explanation
+                            existing_a.display_order = json_a.display_order
                             updated += 1
                     else:
                         new_a = Answer(

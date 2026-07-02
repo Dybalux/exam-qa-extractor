@@ -1,7 +1,8 @@
 """Database session configuration."""
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from collections.abc import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
 
@@ -15,16 +16,14 @@ engine = create_async_engine(
 )
 
 # Create session factory
-AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
     expire_on_commit=False,
-    autocommit=False,
     autoflush=False,
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting database session."""
     async with AsyncSessionLocal() as session:
         try:

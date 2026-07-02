@@ -30,6 +30,37 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
 
+def _get_str_field(value: Any) -> str:
+    from fastapi import UploadFile
+
+    if isinstance(value, UploadFile):
+        return value.filename or ""
+    return str(value) if value is not None else ""
+
+
+def _get_str_field_opt(value: Any) -> str | None:
+    from fastapi import UploadFile
+
+    if value is None:
+        return None
+    if isinstance(value, UploadFile):
+        return value.filename or None
+    return str(value)
+
+
+def _get_int_field(value: Any, default: int = 0) -> int:
+    from fastapi import UploadFile
+
+    if value is None:
+        return default
+    if isinstance(value, UploadFile):
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def _ctx(request: Request, flash: dict | None = None, **kwargs: Any) -> dict:
     """Build base template context with optional flash message."""
     context = {"request": request, **kwargs}
@@ -134,9 +165,9 @@ async def exam_create(
     service: ExamService = Depends(get_exam_service),
 ) -> RedirectResponse:
     form = await request.form()
-    partial_number = int(form.get("partial_number", 1))
-    exam_date_str = form.get("exam_date") or None
-    topic_tags = form.get("topic_tags") or None
+    partial_number = _get_int_field(form.get("partial_number"), 1)
+    exam_date_str = _get_str_field_opt(form.get("exam_date"))
+    topic_tags = _get_str_field_opt(form.get("topic_tags"))
     exam_date = None
     if exam_date_str:
         from datetime import date
@@ -148,14 +179,14 @@ async def exam_create(
     return _redirect_with_flash(f"/exams/{exam.id}", "Examen creado correctamente")
 
 
-@router.get("/exams/{exam_id}", response_class=HTMLResponse)
+@router.get("/exams/{exam_id}", response_class=HTMLResponse, response_model=None)
 async def exam_detail(
     request: Request,
     exam_id: int,
     exam_svc: ExamService = Depends(get_exam_service),
     q_svc: QuestionService = Depends(get_question_service),
     analytics: AnalyticsService = Depends(get_analytics_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         exam = await exam_svc.get_exam(exam_id)
         questions = await q_svc.list_questions(exam_id=exam_id)
@@ -177,12 +208,12 @@ async def exam_detail(
     )
 
 
-@router.get("/exams/{exam_id}/edit", response_class=HTMLResponse)
+@router.get("/exams/{exam_id}/edit", response_class=HTMLResponse, response_model=None)
 async def exam_edit(
     request: Request,
     exam_id: int,
     service: ExamService = Depends(get_exam_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         exam = await service.get_exam(exam_id)
     except NotFoundError:
@@ -205,10 +236,10 @@ async def exam_edit_submit(
     service: ExamService = Depends(get_exam_service),
 ) -> RedirectResponse:
     form = await request.form()
-    partial_number = int(form.get("partial_number", 1))
-    exam_date_str = form.get("exam_date")
+    partial_number = _get_int_field(form.get("partial_number"), 1)
+    exam_date_str = _get_str_field_opt(form.get("exam_date"))
     exam_date = date.fromisoformat(exam_date_str) if exam_date_str else None
-    topic_tags = form.get("topic_tags") or None
+    topic_tags = _get_str_field_opt(form.get("topic_tags"))
     try:
         await service.update_exam(
             exam_id=exam_id,
@@ -272,13 +303,15 @@ async def question_list(
     )
 
 
-@router.get("/questions/{question_id}", response_class=HTMLResponse)
+@router.get(
+    "/questions/{question_id}", response_class=HTMLResponse, response_model=None
+)
 async def question_detail(
     request: Request,
     question_id: int,
     q_svc: QuestionService = Depends(get_question_service),
     a_svc: AnswerService = Depends(get_answer_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         question = await q_svc.get_question(question_id)
         answers = await a_svc.list_answers(question_id)
@@ -298,12 +331,14 @@ async def question_detail(
     )
 
 
-@router.get("/questions/{question_id}/correct", response_class=HTMLResponse)
+@router.get(
+    "/questions/{question_id}/correct", response_class=HTMLResponse, response_model=None
+)
 async def question_correct(
     request: Request,
     question_id: int,
     service: QuestionService = Depends(get_question_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         question = await service.get_question(question_id)
     except NotFoundError:
@@ -326,8 +361,8 @@ async def question_correct_submit(
     service: QuestionService = Depends(get_question_service),
 ) -> RedirectResponse:
     form = await request.form()
-    corrected_text = form.get("corrected_text", "")
-    notes = form.get("notes") or None
+    corrected_text = _get_str_field(form.get("corrected_text", ""))
+    notes = _get_str_field_opt(form.get("notes"))
     await service.correct_ocr_text(
         question_id=question_id, corrected_text=corrected_text, notes=notes
     )
@@ -336,12 +371,12 @@ async def question_correct_submit(
     )
 
 
-@router.get("/exams/{exam_id}/upload", response_class=HTMLResponse)
+@router.get("/exams/{exam_id}/upload", response_class=HTMLResponse, response_model=None)
 async def bulk_upload_page(
     request: Request,
     exam_id: int,
     service: ExamService = Depends(get_exam_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         exam = await service.get_exam(exam_id)
     except NotFoundError:
@@ -357,13 +392,15 @@ async def bulk_upload_page(
     )
 
 
-@router.get("/exams/{exam_id}/questions/new", response_class=HTMLResponse)
+@router.get(
+    "/exams/{exam_id}/questions/new", response_class=HTMLResponse, response_model=None
+)
 async def manual_question_form(
     request: Request,
     exam_id: int,
     exam_svc: ExamService = Depends(get_exam_service),
     topics: list[dict[str, str]] = Depends(get_all_topics),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     """Show form to manually add a question with correct answer."""
 
     try:
@@ -402,11 +439,11 @@ async def manual_question_create(
     form = await request.form()
 
     # Extract form data
-    question_text = form.get("question_text", "").strip()
-    topic = form.get("topic", "")
-    order_in_exam = form.get("order_in_exam")
-    correct_answer_text = form.get("correct_answer_text", "").strip()
-    explanation = form.get("explanation", "").strip() or None
+    question_text = _get_str_field(form.get("question_text", "")).strip()
+    topic = _get_str_field(form.get("topic", ""))
+    order_in_exam_str = _get_str_field_opt(form.get("order_in_exam"))
+    correct_answer_text = _get_str_field(form.get("correct_answer_text", "")).strip()
+    explanation = _get_str_field(form.get("explanation", "")).strip() or None
 
     # Validation
     errors = []
@@ -432,7 +469,7 @@ async def manual_question_create(
             exam_id=exam_id,
             question_text=question_text,
             topic=topic,
-            order_in_exam=int(order_in_exam) if order_in_exam else None,
+            order_in_exam=int(order_in_exam_str) if order_in_exam_str else None,
             image_id=None,  # No image since it's manual
             extracted_text=None,
             confidence_score=None,
@@ -474,12 +511,16 @@ async def manual_question_create(
 # ── Answers ──────────────────────────────────────────────────
 
 
-@router.get("/questions/{question_id}/answers/new", response_class=HTMLResponse)
+@router.get(
+    "/questions/{question_id}/answers/new",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 async def answer_new(
     request: Request,
     question_id: int,
     q_svc: QuestionService = Depends(get_question_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         question = await q_svc.get_question(question_id)
     except NotFoundError:
@@ -505,9 +546,9 @@ async def answer_create(
     form = await request.form()
     await service.create_answer(
         question_id=question_id,
-        answer_text=form.get("answer_text", ""),
-        answer_type=form.get("answer_type", "incorrect"),
-        explanation=form.get("explanation") or None,
+        answer_text=_get_str_field(form.get("answer_text", "")),
+        answer_type=_get_str_field(form.get("answer_type", "incorrect")),
+        explanation=_get_str_field_opt(form.get("explanation")),
         is_common_misconception=form.get("is_common_misconception") == "on",
     )
     return _redirect_with_flash(
@@ -516,7 +557,9 @@ async def answer_create(
 
 
 @router.get(
-    "/questions/{question_id}/answers/{answer_id}/edit", response_class=HTMLResponse
+    "/questions/{question_id}/answers/{answer_id}/edit",
+    response_class=HTMLResponse,
+    response_model=None,
 )
 async def answer_edit(
     request: Request,
@@ -524,7 +567,7 @@ async def answer_edit(
     answer_id: int,
     q_svc: QuestionService = Depends(get_question_service),
     a_svc: AnswerService = Depends(get_answer_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         question = await q_svc.get_question(question_id)
         answer = await a_svc.get_answer(answer_id)
@@ -553,9 +596,9 @@ async def answer_update(
     try:
         await service.update_answer(
             answer_id=answer_id,
-            answer_text=form.get("answer_text", ""),
-            answer_type=form.get("answer_type", "incorrect"),
-            explanation=form.get("explanation") or None,
+            answer_text=_get_str_field(form.get("answer_text", "")),
+            answer_type=_get_str_field(form.get("answer_type", "incorrect")),
+            explanation=_get_str_field_opt(form.get("explanation")),
             is_common_misconception=form.get("is_common_misconception") == "on",
         )
         message = "Respuesta actualizada correctamente"
@@ -566,13 +609,17 @@ async def answer_update(
     return _redirect_with_flash(f"/questions/{question_id}", message, type_)
 
 
-@router.get("/questions/{question_id}/answers/manage", response_class=HTMLResponse)
+@router.get(
+    "/questions/{question_id}/answers/manage",
+    response_class=HTMLResponse,
+    response_model=None,
+)
 async def answer_manage(
     request: Request,
     question_id: int,
     q_svc: QuestionService = Depends(get_question_service),
     a_svc: AnswerService = Depends(get_answer_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         question = await q_svc.get_question(question_id)
         answers = await a_svc.list_answers(question_id)
@@ -621,27 +668,33 @@ async def practice_create(
 ) -> RedirectResponse:
     form = await request.form()
     user_session_id = _session_id(request)
-    exam_id = int(form["exam_id"]) if form.get("exam_id") else None
-    topic = form.get("topic") or None
+    exam_id_str = _get_str_field_opt(form.get("exam_id"))
+    exam_id = int(exam_id_str) if exam_id_str else None
+    topic = _get_str_field_opt(form.get("topic"))
+    total_questions_str = _get_str_field(form.get("total_questions", "10"))
     session = await service.create_session(
         user_session_id=user_session_id,
-        mode=form.get("mode", "random"),
+        mode=_get_str_field(form.get("mode", "random")),
         exam_id=exam_id,
         filters={"topic": topic} if topic else None,
-        total_questions=int(form.get("total_questions", 10)),
+        total_questions=int(total_questions_str)
+        if total_questions_str.isdigit()
+        else 10,
     )
     response = RedirectResponse(url=f"/practice/{session.id}/play", status_code=303)
     response.set_cookie("session_id", user_session_id, max_age=86400)
     return response
 
 
-@router.get("/practice/{session_id}/play", response_class=HTMLResponse)
+@router.get(
+    "/practice/{session_id}/play", response_class=HTMLResponse, response_model=None
+)
 async def practice_play(
     request: Request,
     session_id: int,
     service: PracticeService = Depends(get_practice_service),
     a_svc: AnswerService = Depends(get_answer_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         session = await service.get_session(session_id)
         if session.is_completed:
@@ -654,7 +707,7 @@ async def practice_play(
             return RedirectResponse(
                 url=f"/practice/{session_id}/results", status_code=302
             )
-        answers = await a_svc.list_answers(question.id)
+        answers = list(await a_svc.list_answers(question.id))
         random.shuffle(
             answers
         )  # Randomize answer order so correct answer isn't always first
@@ -680,9 +733,9 @@ async def practice_submit(
     service: PracticeService = Depends(get_practice_service),
 ) -> RedirectResponse:
     form = await request.form()
-    question_id = int(form["question_id"])
-    selected_answer_id = int(form["selected_answer_id"])
-    time_spent = int(form.get("time_spent_seconds", 0))
+    question_id = int(_get_str_field(form["question_id"]))
+    selected_answer_id = int(_get_str_field(form["selected_answer_id"]))
+    time_spent = int(_get_str_field(form.get("time_spent_seconds", "0")))
     await service.submit_answer(
         session_id=session_id,
         question_id=question_id,
@@ -699,20 +752,22 @@ async def practice_skip(
     service: PracticeService = Depends(get_practice_service),
 ) -> RedirectResponse:
     form = await request.form()
-    question_id = int(form["question_id"])
-    time_spent = int(form.get("time_spent_seconds", 0))
+    question_id = int(_get_str_field(form["question_id"]))
+    time_spent = int(_get_str_field(form.get("time_spent_seconds", "0")))
     await service.skip_question(
         session_id=session_id, question_id=question_id, time_spent_seconds=time_spent
     )
     return RedirectResponse(url=f"/practice/{session_id}/play", status_code=303)
 
 
-@router.get("/practice/{session_id}/results", response_class=HTMLResponse)
+@router.get(
+    "/practice/{session_id}/results", response_class=HTMLResponse, response_model=None
+)
 async def practice_results(
     request: Request,
     session_id: int,
     service: PracticeService = Depends(get_practice_service),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     try:
         session = await service.get_session(session_id)
         results = await service.get_session_results(session_id)

@@ -148,16 +148,24 @@ async def upload_exam_image(
         )
 
     try:
-        # Save file first
+        # Read file data into BytesIO stream
+        import io
+
+        file_bytes = await file.read()
+        file_stream = io.BytesIO(file_bytes)
+
+        # Save file using storage service
         upload_result = await storage_svc.save_file(
-            file_data=await file.read(),
+            file_data=file_stream,
             original_filename=file.filename,
             exam_id=exam_id,
         )
 
+        logger.info(f"File saved: {upload_result.storage_path}")
+
         try:
             # Process OCR
-            ocr_result = await ocr_svc.process_image(upload_result.absolute_path)
+            ocr_result = await ocr_svc.extract_from_path(upload_result.storage_path)
         except Exception as ocr_err:
             # OCR failed but file was saved - redirect with warning
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")
