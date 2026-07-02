@@ -75,12 +75,12 @@ Chain strategy: pending
 
 ## Phase 5: Testing + Spec Amendment
 
-- [ ] 5.1 Pytest: test `redirect_with_flash` URL-encoding — messages with `&`, `#`, spaces, non-ASCII (e.g. `ó`) produce well-formed redirect URLs. *(Design decision 9)* ~15 lines, low risk
+- [x] 5.1 Pytest: test `redirect_with_flash` URL-encoding — messages with `&`, `#`, spaces, non-ASCII (e.g. `ó`) produce well-formed redirect URLs. *(Design decision 9)* ~15 lines, low risk
 
-- [ ] 5.2 Pytest: test `return_to` open-redirect validation in `upload_exam_image` — `return_to="//evil.com"`, `return_to="https://evil.com"`, `return_to="/unknown"` → fallback default used; valid `return_to="/exams/999"` → redirect to that path. *(Design decision 6)* ~20 lines, medium risk
+- [x] 5.2 Pytest: test `return_to` open-redirect validation in `upload_exam_image` — `return_to="//evil.com"`, `return_to="https://evil.com"`, `return_to="/unknown"` → fallback default used; valid `return_to="/exams/999"` → redirect to that path. *(Design decision 6)* ~20 lines, medium risk
 
-- [ ] 5.3 Pytest: test redirect target URLs in `exam_create`, `exam_edit_submit`, `manual_question_create`, `question_correct_submit` — assert redirect URL contains correct path and flash query params. *(Spec: POST-SAVE REDIRECT)* ~20 lines, low risk
+- [x] 5.3 Pytest: test redirect target URLs in `exam_create`, `exam_edit_submit`, `manual_question_create`, `question_correct_submit` — assert redirect URL contains correct path and flash query params. *(Spec: POST-SAVE REDIRECT)* ~20 lines, low risk
 
-- [ ] 5.4 Amend `form-interaction/spec.md`: flag scenario "Reorder degrades without JavaScript" as FALSE (no-JS path 422s today). Recommend dropping the degradation scenario and stating that reorder requires JavaScript. *(Design decision 7, open question W1)* ~3 lines, low risk
+- [x] 5.4 Amend `form-interaction/spec.md`: flag scenario "Reorder degrades without JavaScript" as FALSE (no-JS path 422s today). Recommend dropping the degradation scenario and stating that reorder requires JavaScript. *(Design decision 7, open question W1)* ~3 lines, low risk
 
 - [ ] 5.5 Manual JS testing: verify dirty flag lifecycle (set on input/change, clear on submit), unsaved modal open on dirty+Cancel, Escape key closes modal, Tab-trap cycles focus, focus restoration on close, reorder POST body contract and redirect target. *(Spec: UNSAVED CHANGES GUARD + ANSWER REORDER)*
