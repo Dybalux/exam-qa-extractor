@@ -31,7 +31,7 @@ Chain strategy: pending
 
 - [x] 1.2 Update `app/api/pages.py`: replace local `_redirect_with_flash` with `from app.api._flash import redirect_with_flash`; update all 4 call sites (lines 148, 221, 334, 457) to use the imported function. *(Design decision 9)* ~10 lines, low risk
 
-- [ ] 1.3 Hoist `showToast`, `escapeHtml`, and `toastContainer` out of the delete-modal IIFE in `app/static/js/app.js` to global scope (attach to `window`). Keep existing IIFE functional. *(Design decision 9)* ~20 lines, medium risk (refactor of existing code)
+- [x] 1.3 Hoist `showToast`, `escapeHtml`, and `toastContainer` out of the delete-modal IIFE in `app/static/js/app.js` to global scope (attach to `window`). Keep existing IIFE functional. *(Design decision 9)* ~20 lines, medium risk (refactor of existing code)
 
 - [x] 1.4 Add `.form-card` centering rule inside `@media (min-width: 1024px)` in `app/static/css/styles.css`: `.form-card { max-width: 520px; margin-inline: auto; }`. *(Design decision 8, spec: DESKTOP FORM CENTERING)* ~5 lines, low risk
 
@@ -65,13 +65,13 @@ Chain strategy: pending
 
 ## Phase 4: JavaScript — Dirty Tracking + Modal + Reorder
 
-- [ ] 4.1 Add new IIFE in `app/static/js/app.js` for dirty tracking: `input`/`change` event delegation on `document`, matching `[data-track-dirty]` forms; set `data-dirty="true"` on first modification; clear on submit. *(Design decision 3, spec: UNSAVED CHANGES GUARD)* ~20 lines, low risk
+- [x] 4.1 Add new IIFE in `app/static/js/app.js` for dirty tracking: `input`/`change` event delegation on `document`, matching `[data-track-dirty]` forms; set `data-dirty="true"` on first modification; clear on submit. *(Design decision 3, spec: UNSAVED CHANGES GUARD)* ~20 lines, low risk
 
-- [ ] 4.2 Add cancel-link interception (two-tier) in the same IIFE: Tier 1 — intercept `[data-cancel-for]` clicks, look up form via `document.getElementById(link.dataset.cancelFor)`, open modal if form is `data-dirty="true"`. Tier 2 — intercept in-form Cancel clicks via `link.closest('form[data-track-dirty]')`, same modal routing. *(Design decision 3)* ~25 lines, medium risk
+- [x] 4.2 Add cancel-link interception (two-tier) in the same IIFE: Tier 1 — intercept `[data-cancel-for]` clicks, look up form via `document.getElementById(link.dataset.cancelFor)`, open modal if form is `data-dirty="true"`. Tier 2 — intercept in-form Cancel clicks via `link.closest('form[data-track-dirty]')`, same modal routing. *(Design decision 3)* ~25 lines, medium risk
 
-- [ ] 4.3 Add `openUnsavedModal(href)` / `closeUnsavedModal()` handlers: show/hide `#unsaved-modal`, wire "Guardar y salir" → `form.submit()`, "Descartar" → `window.location = href`, "Cancelar"/Escape → close. Add Tab-trap keydown handler + focus restoration to trigger on close for BOTH delete modal and `#unsaved-modal`. *(Design decision 3+4, spec: UNSAVED CHANGES GUARD)* ~40 lines, medium risk
+- [x] 4.3 Add `openUnsavedModal(href)` / `closeUnsavedModal()` handlers: show/hide `#unsaved-modal`, wire "Guardar y salir" → `form.submit()`, "Descartar" → `window.location = href`, "Cancelar"/Escape → close. Add Tab-trap keydown handler + focus restoration to trigger on close for BOTH delete modal and `#unsaved-modal`. *(Design decision 3+4, spec: UNSAVED CHANGES GUARD)* ~40 lines, medium risk
 
-- [ ] 4.4 Add reorder fetch interceptor: intercept `#reorder-form` submit, prevent default, `fetch` POST with `{"ordered_ids": [...]}` (Content-Type: application/json), show toast on success → `window.location` redirect to `/questions/{qid}` (parsed from form `action` or `data-question-id`). On failure → error toast, stay on page. Pre-fill hidden `ordered_ids` from DOM order on page load. *(Design decision 7, spec: ANSWER REORDER FETCH REDIRECT)* ~30 lines, medium risk
+- [x] 4.4 Add reorder fetch interceptor: intercept `#reorder-form` submit, prevent default, `fetch` POST with `{"ordered_ids": [...]}` (Content-Type: application/json), show toast on success → `window.location` redirect to `/questions/{qid}` (parsed from form `action` or `data-question-id`). On failure → error toast, stay on page. Pre-fill hidden `ordered_ids` from DOM order on page load. *(Design decision 7, spec: ANSWER REORDER FETCH REDIRECT)* ~30 lines, medium risk
 
 ## Phase 5: Testing + Spec Amendment
 
