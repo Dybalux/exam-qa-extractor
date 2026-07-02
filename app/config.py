@@ -28,8 +28,17 @@ class Settings(BaseSettings):
     max_import_size_mb: int = 10
 
     # OCR
+    ocr_provider: str = "tesseract"
     tesseract_cmd: str = "tesseract"
     tesseract_lang: str = "spa"
+    openai_api_key: str | None = None
+    openai_vision_model: str = "gpt-4o-mini"
+    openai_max_image_size_mb: int = 4
+
+    # Observability — Langfuse
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "http://localhost:3000"
 
     # App
     debug: bool = False

@@ -1,8 +1,8 @@
-"""OCR Service for text extraction using Tesseract."""
+"""Tesseract OCR provider implementation."""
 
 import logging
 import re
-from dataclasses import dataclass
+import string
 from pathlib import Path
 from typing import BinaryIO
 
@@ -11,8 +11,10 @@ import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 
 from app.config import get_settings
-from app.core.constants import CONFIDENCE_HIGH, CONFIDENCE_MEDIUM
+from app.core.constants import CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM
 from app.core.exceptions import OCRProcessingError
+from app.services.ocr.base import BaseOCRProvider
+from app.services.ocr.types import ExtractedQuestion, OCRResult
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -21,31 +23,14 @@ settings = get_settings()
 pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
 
 
-@dataclass
-class ExtractedQuestion:
-    """Represents an extracted question with metadata."""
+class TesseractProvider(BaseOCRProvider):
+    """Tesseract-based OCR provider.
 
-    order: int
-    text: str
-    confidence: float
-    requires_review: bool
-
-
-@dataclass
-class OCRResult:
-    """Result of OCR processing."""
-
-    full_text: str
-    questions: list[ExtractedQuestion]
-    has_code: bool
-    average_confidence: float
-
-
-class OCRService:
-    """Service for OCR text extraction and processing."""
+    Encapsulates all current OCRService Tesseract/pytesseract logic.
+    """
 
     def __init__(self, tesseract_cmd: str | None = None, lang: str | None = None):
-        """Initialize OCR service.
+        """Initialize Tesseract provider.
 
         Args:
             tesseract_cmd: Path to tesseract binary (optional, uses settings if not provided)
@@ -54,6 +39,11 @@ class OCRService:
         self.tesseract_cmd = tesseract_cmd or settings.tesseract_cmd
         self.lang = lang or settings.tesseract_lang
         self._check_tesseract()
+
+    @property
+    def engine_name(self) -> str:
+        """Return the provider's identifier string."""
+        return "tesseract"
 
     def _check_tesseract(self) -> None:
         """Check if Tesseract is installed."""
@@ -64,6 +54,14 @@ class OCRService:
             raise OCRProcessingError(
                 "Tesseract OCR is not installed. Please install Tesseract and configure TESSERACT_CMD."
             )
+
+    def health_check(self) -> dict:
+        """Return provider health status."""
+        try:
+            pytesseract.get_tesseract_version()
+            return {"status": "ok", "engine": self.engine_name}
+        except Exception as e:
+            return {"status": "error", "engine": self.engine_name, "error": str(e)}
 
     def _preprocess_image(self, image: Image.Image) -> Image.Image:
         """Preprocess image for better OCR results.
@@ -185,8 +183,6 @@ class OCRService:
         Returns:
             Estimated confidence score (0-100)
         """
-        import string
-
         score = 100.0
 
         # Penalize for garbled characters (non-alphanumeric, non-whitespace, non-punctuation)
@@ -218,36 +214,6 @@ class OCRService:
                 score -= 5
 
         return max(0.0, min(100.0, score))
-
-    async def extract_text(
-        self,
-        file_data: BinaryIO,
-        preprocess: bool = True,
-    ) -> OCRResult:
-        """Extract text from image file.
-
-        Args:
-            file_data: Binary file data
-            preprocess: Whether to apply image preprocessing
-
-        Returns:
-            OCRResult with extracted text and questions
-
-        Raises:
-            OCRProcessingError: If extraction fails
-        """
-        try:
-            # Load image
-            image = Image.open(file_data)
-
-            # Process the image
-            return await self.extract_text_from_image(image, preprocess)
-
-        except OCRProcessingError:
-            raise
-        except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            raise OCRProcessingError(f"Failed to extract text: {str(e)}")
 
     def _extract_text_from_pdf_direct(self, file_path: Path) -> str | None:
         """Try to extract text directly from PDF (no OCR).
@@ -308,35 +274,6 @@ class OCRService:
             logger.error(f"Failed to convert PDF to image: {e}")
             raise OCRProcessingError(f"Failed to process PDF: {e}")
 
-    async def extract_from_path(self, file_path: Path) -> OCRResult:
-        """Extract text from image or PDF file path.
-
-        For PDFs: tries direct text extraction first, falls back to OCR if needed.
-        For images: uses OCR directly.
-
-        Args:
-            file_path: Path to image or PDF file
-
-        Returns:
-            OCRResult with extracted text
-        """
-        # Check if file is PDF
-        if file_path.suffix.lower() == ".pdf":
-            # Try direct text extraction first
-            direct_text = self._extract_text_from_pdf_direct(file_path)
-
-            if direct_text:
-                logger.info("PDF has embedded text, using direct extraction")
-                return self._process_extracted_text(direct_text)
-            else:
-                logger.info("PDF appears to be image-based, using OCR")
-                image = self._pdf_to_image(file_path)
-                return await self.extract_text_from_image(image)
-
-        # Regular image file
-        with open(file_path, "rb") as f:
-            return await self.extract_text(f)
-
     def _process_extracted_text(self, text: str) -> OCRResult:
         """Process already-extracted text into OCRResult format.
 
@@ -382,9 +319,36 @@ class OCRService:
             average_confidence=avg_confidence,
         )
 
-    async def extract_text_from_image(
-        self, image: Image.Image, preprocess: bool = True
-    ) -> OCRResult:
+    async def extract_from_path(self, file_path: Path) -> OCRResult:
+        """Extract text from image or PDF file path.
+
+        For PDFs: tries direct text extraction first, falls back to OCR if needed.
+        For images: uses OCR directly.
+
+        Args:
+            file_path: Path to image or PDF file
+
+        Returns:
+            OCRResult with extracted text
+        """
+        # Check if file is PDF
+        if file_path.suffix.lower() == ".pdf":
+            # Try direct text extraction first
+            direct_text = self._extract_text_from_pdf_direct(file_path)
+
+            if direct_text:
+                logger.info("PDF has embedded text, using direct extraction")
+                return self._process_extracted_text(direct_text)
+            else:
+                logger.info("PDF appears to be image-based, using OCR")
+                image = self._pdf_to_image(file_path)
+                return await self.extract_from_image(image)
+
+        # Regular image file
+        with open(file_path, "rb") as f:
+            return await self.extract_text(f)
+
+    async def extract_from_image(self, image: Image.Image, preprocess: bool = True) -> OCRResult:
         """Extract text from PIL Image using OCR.
 
         Args:
@@ -409,6 +373,32 @@ class OCRService:
                 )
 
             return self._process_extracted_text(full_text)
+
+        except OCRProcessingError:
+            raise
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {e}")
+            raise OCRProcessingError(f"Failed to extract text: {str(e)}")
+
+    async def extract_text(self, file_data: BinaryIO, preprocess: bool = True) -> OCRResult:
+        """Extract text from image file data (backward-compatible shim).
+
+        Args:
+            file_data: Binary file data
+            preprocess: Whether to apply image preprocessing
+
+        Returns:
+            OCRResult with extracted text and questions
+
+        Raises:
+            OCRProcessingError: If extraction fails
+        """
+        try:
+            # Load image
+            image = Image.open(file_data)
+
+            # Process the image
+            return await self.extract_from_image(image, preprocess)
 
         except OCRProcessingError:
             raise

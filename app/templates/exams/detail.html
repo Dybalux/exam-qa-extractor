@@ -58,7 +58,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>#</th><th>Pregunta</th><th>Topic</th><th>Dif.</th><th>Estado</th><th></th></tr>
+        <tr><th>#</th><th>Pregunta</th><th>Topic</th><th>Estado</th><th></th></tr>
       </thead>
       <tbody>
       {% for q in questions %}
@@ -93,6 +93,7 @@
   <div class="empty-state">
     <h3>Sin preguntas</h3>
     <p>Subí una imagen del examen para extraer preguntas con OCR.</p>
+    <p class="text-xs text-muted mt-2">ℹ️ Si subís un PDF de varias páginas, solo se procesará la primera página.</p>
     <a href="/exams/{{ exam.id }}/upload" class="btn btn-primary mt-4">↑ Subir imagen</a>
   </div>
   {% endif %}

@@ -67,6 +67,13 @@ htmlcov/
 # Don't ignore migrations, but ignore local dev files
 alembic.ini.local
 
+# SDD
+.atl/
+
+# Docker
+docker-compose.observability.yml
+config/
+
 # Misc
 *.bak
 *.tmp
@@ -79,3 +86,6 @@ parse_engram.py
 save_verify_report.py
 engram-export.json
 database_backup_*.json
+
+openspec/
+exam_images/
