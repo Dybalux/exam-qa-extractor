@@ -26,6 +26,8 @@ from app.services.practice_service import PracticeService
 from app.services.question_service import QuestionService
 from app.services.search_service import SearchService
 
+from app.api._flash import redirect_with_flash
+
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
@@ -45,15 +47,6 @@ def _get_flash_from_query(request: Request) -> dict | None:
     if message:
         return {"type": msg_type, "message": message}
     return None
-
-
-def _redirect_with_flash(
-    url: str, message: str, msg_type: str = "success"
-) -> RedirectResponse:
-    """Create redirect response with flash message in query params."""
-    separator = "&" if "?" in url else "?"
-    redirect_url = f"{url}{separator}message={message}&type={msg_type}"
-    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 def _session_id(request: Request) -> str:
@@ -145,7 +138,7 @@ async def exam_create(
     exam = await service.create_exam(
         partial_number=partial_number, exam_date=exam_date, topic_tags=topic_tags
     )
-    return _redirect_with_flash(f"/exams/{exam.id}", "Examen creado correctamente")
+    return redirect_with_flash("/exams", "Examen guardado")
 
 
 @router.get("/exams/{exam_id}", response_class=HTMLResponse)
@@ -218,7 +211,7 @@ async def exam_edit_submit(
         )
     except NotFoundError:
         return RedirectResponse(url="/exams", status_code=302)
-    return RedirectResponse(url=f"/exams/{exam_id}", status_code=303)
+    return redirect_with_flash("/exams", "Examen guardado")
 
 
 # ── Questions ────────────────────────────────────────────────
@@ -331,8 +324,8 @@ async def question_correct_submit(
     await service.correct_ocr_text(
         question_id=question_id, corrected_text=corrected_text, notes=notes
     )
-    return _redirect_with_flash(
-        f"/questions/{question_id}", "Corrección guardada correctamente"
+    return redirect_with_flash(
+        "/questions", "Corrección guardada"
     )
 
 
@@ -420,7 +413,7 @@ async def manual_question_create(
     if errors:
         # Re-render form with errors (simplified - just redirect back for now)
         # In a full implementation, you'd re-render with error messages
-        return _redirect_with_flash(
+        return redirect_with_flash(
             f"/exams/{exam_id}/questions/new",
             "Error: " + ", ".join(errors),
             msg_type="error",
@@ -454,9 +447,9 @@ async def manual_question_create(
             display_order=0,
         )
 
-        return _redirect_with_flash(
-            f"/questions/{question.id}",
-            "Pregunta y respuesta correcta guardadas. Ahora podés agregar respuestas incorrectas (distractores).",
+        return redirect_with_flash(
+            "/questions",
+            "Pregunta guardada",
         )
 
     except Exception as e:
@@ -464,7 +457,7 @@ async def manual_question_create(
         import logging
 
         logging.getLogger(__name__).error(f"Error creating manual question: {e}")
-        return _redirect_with_flash(
+        return redirect_with_flash(
             f"/exams/{exam_id}/questions/new",
             f"Error al guardar: {str(e)}",
             msg_type="error",
@@ -510,7 +503,7 @@ async def answer_create(
         explanation=form.get("explanation") or None,
         is_common_misconception=form.get("is_common_misconception") == "on",
     )
-    return _redirect_with_flash(
+    return redirect_with_flash(
         f"/questions/{question_id}", "Respuesta agregada correctamente"
     )
 
@@ -563,7 +556,7 @@ async def answer_update(
     except Exception as e:
         message = f"Error al actualizar: {str(e)}"
         type_ = "error"
-    return _redirect_with_flash(f"/questions/{question_id}", message, type_)
+    return redirect_with_flash(f"/questions/{question_id}", message, type_)
 
 
 @router.get("/questions/{question_id}/answers/manage", response_class=HTMLResponse)

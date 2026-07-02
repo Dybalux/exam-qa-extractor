@@ -1,10 +1,13 @@
 """Exam API routes."""
 
 import logging
+import re
+import urllib.parse
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import RedirectResponse
 
+from app.api._flash import redirect_with_flash
 from app.core.exceptions import (
     FileValidationError,
     NotFoundError,
@@ -24,6 +27,38 @@ from app.services.storage_service import StorageService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_EXAMS_PATH_RE = re.compile(r"/exams/\d+")
+
+
+def _validate_return_to(value: str, exam_id: int) -> str | None:
+    """Validate and sanitise a ``return_to`` value for image upload redirects.
+
+    Args:
+        value: Raw ``return_to`` from the hidden form field.
+        exam_id: The exam ID from the route parameter (trusted).
+
+    Returns:
+        A safe redirect URL with ``exam_id`` query param, or ``None`` if
+        the value is rejected (open-redirect / unknown path / absolute URL).
+    """
+    parsed = urllib.parse.urlsplit(value)
+    # Reject absolute and protocol-relative URLs.
+    if parsed.netloc or parsed.scheme:
+        return None
+    path = parsed.path
+    if path == "/search/needs-review":
+        pass
+    elif _EXAMS_PATH_RE.fullmatch(path):
+        # Pin exam_id from the route param, not the user-supplied value.
+        path = f"/exams/{exam_id}"
+    else:
+        return None
+    # Preserve existing query params and add exam_id.
+    qs = urllib.parse.parse_qs(parsed.query)
+    qs["exam_id"] = [str(exam_id)]
+    new_qs = urllib.parse.urlencode(qs, doseq=True)
+    return f"{path}?{new_qs}" if new_qs else path
 
 
 @router.post("/", response_model=ExamResponse, status_code=201)
@@ -124,6 +159,7 @@ async def upload_exam_image(
     exam_id: int,
     file: UploadFile = File(...),
     language: str = "spa",
+    return_to: str | None = Form(None),
     exam_svc: ExamService = Depends(get_exam_service),
     storage_svc: StorageService = Depends(get_storage_service),
     ocr_svc: OCRService = Depends(get_ocr_service),
@@ -142,9 +178,8 @@ async def upload_exam_image(
 
     # Validate file was provided
     if not file.filename:
-        return RedirectResponse(
-            url=f"/exams/{exam_id}/upload?message=No+se+proporcionó+archivo&type=error",
-            status_code=303,
+        return redirect_with_flash(
+            f"/exams/{exam_id}/upload", "No se proporcionó archivo", "error"
         )
 
     try:
@@ -161,9 +196,10 @@ async def upload_exam_image(
         except Exception as ocr_err:
             # OCR failed but file was saved - redirect with warning
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")
-            return RedirectResponse(
-                url=f"/exams/{exam_id}?message=Archivo+guardado+pero+OCR+falló:+{str(ocr_err)}&type=warning",
-                status_code=303,
+            return redirect_with_flash(
+                f"/exams/{exam_id}",
+                f"Archivo guardado pero OCR falló: {str(ocr_err)}",
+                "warning",
             )
 
         # Create questions from OCR results
@@ -190,35 +226,44 @@ async def upload_exam_image(
                 logger.error(f"Failed to create question from OCR: {e}")
                 continue
 
-        # Build redirect message
+        # Determine redirect target (success path may be overridden by return_to).
         if questions_created > 0:
             if questions_needing_review > 0:
-                message = f"Se crearon {questions_created} preguntas. {questions_needing_review} necesitan revisión."
-                redirect_url = f"/search/needs-review?exam_id={exam_id}&message={message.replace(' ', '+')}"
+                default_url = f"/search/needs-review?exam_id={exam_id}"
+                message = (
+                    f"Se crearon {questions_created} preguntas. "
+                    f"{questions_needing_review} necesitan revisión."
+                )
             else:
+                default_url = f"/exams/{exam_id}"
                 message = f"Se crearon {questions_created} preguntas correctamente."
-                redirect_url = f"/exams/{exam_id}?message={message.replace(' ', '+')}"
+
+            # Apply return_to override if valid (success path only).
+            if return_to:
+                validated = _validate_return_to(return_to, exam_id)
+                if validated:
+                    return redirect_with_flash(validated, message)
+            return redirect_with_flash(default_url, message)
         else:
             message = "No se pudieron extraer preguntas del archivo."
-            redirect_url = f"/exams/{exam_id}/upload?message={message.replace(' ', '+')}&type=warning"
-
-        return RedirectResponse(url=redirect_url, status_code=303)
+            return redirect_with_flash(
+                f"/exams/{exam_id}/upload", message, "warning"
+            )
 
     except FileValidationError as e:
         logger.warning(f"File validation failed: {e}")
-        return RedirectResponse(
-            url=f"/exams/{exam_id}/upload?message=Archivo+inválido:+{str(e.message)}&type=error",
-            status_code=303,
+        return redirect_with_flash(
+            f"/exams/{exam_id}/upload", f"Archivo inválido: {str(e.message)}", "error"
         )
     except StorageError as e:
         logger.error(f"Storage error: {e}")
-        return RedirectResponse(
-            url=f"/exams/{exam_id}/upload?message=Error+al+guardar+archivo:+{str(e.message)}&type=error",
-            status_code=303,
+        return redirect_with_flash(
+            f"/exams/{exam_id}/upload",
+            f"Error al guardar archivo: {str(e.message)}",
+            "error",
         )
     except Exception as e:
         logger.error(f"Unexpected error processing upload: {e}")
-        return RedirectResponse(
-            url=f"/exams/{exam_id}/upload?message=Error+inesperado:+{str(e)}&type=error",
-            status_code=303,
+        return redirect_with_flash(
+            f"/exams/{exam_id}/upload", f"Error inesperado: {str(e)}", "error"
         )
