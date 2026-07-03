@@ -151,10 +151,10 @@ tr:hover td { background: var(--bg-elevated); }
   .data-list-header { display: grid; gap: 16px; padding: 10px 16px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
   .data-list-row { display: grid; gap: 16px; padding: 12px 16px; border-radius: 0; border: none; border-bottom: 1px solid var(--border-soft); background: transparent; }
   .data-list-cell::before { display: none; }
-  .data-list-cell { display: block; }
+  .data-list-cell { display: block; min-width: 0; overflow: hidden; }
   
   .grid-exams { grid-template-columns: 100px 120px 1fr 200px; }
-  .grid-questions { grid-template-columns: minmax(200px, 2fr) 100px 100px 80px 100px 180px; }
+  .grid-questions { grid-template-columns: minmax(200px, 2fr) 100px 100px 160px 260px; }
   .grid-dashboard-exams { grid-template-columns: 100px 120px 1fr 100px 100px; }
 }
 

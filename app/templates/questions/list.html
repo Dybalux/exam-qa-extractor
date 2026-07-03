@@ -49,17 +49,17 @@
 <div class="card">
   <div class="data-list">
     <div class="data-list-header grid-questions">
-      <div>Pregunta</div><div>Examen</div><div>Topic</div><div>Dif.</div><div>Estado</div><div>Acciones</div>
+      <div>Pregunta</div><div>Examen</div><div>Topic</div><div>Estado</div><div>Acciones</div>
     </div>
     {% for q in questions %}
     <div class="data-list-row grid-questions">
-      <div class="data-list-cell" data-label="Pregunta" style="align-items: flex-start; text-align: right;">
+      <div class="data-list-cell" data-label="Pregunta" style="align-items: flex-start; text-align: left;">
         <div style="min-width: 0; flex: 1;">
-          <a href="/questions/{{ q.id }}" style="display:inline-block; text-align: left; max-width: 100%;">
+          <a href="/questions/{{ q.id }}" style="display:block; text-align: left; max-width: 100%;">
             {{ q.question_text }}
           </a>
           {% if q.confidence_score is not none %}
-          <div class="text-xs text-muted" style="margin-top: 4px; text-align: right;">OCR: {{ '%.0f'|format(q.confidence_score) }}%</div>
+          <div class="text-xs text-muted" style="margin-top: 4px; text-align: left;">OCR: {{ '%.0f'|format(q.confidence_score) }}%</div>
           {% endif %}
         </div>
       </div>
@@ -69,15 +69,15 @@
       <div class="data-list-cell" data-label="Topic">
         <span class="badge topic-{{ q.topic }}">{{ q.topic }}</span>
       </div>
-      <div class="data-list-cell" data-label="Estado">
-        <div class="flex gap-2">
+      <div class="data-list-cell" data-label="Estado" style="min-width: 0;">
+        <div class="flex gap-2 flex-wrap" style="justify-content: flex-end;">
           {% if q.is_ready_for_practice %}<span class="badge badge-success">✓</span>
           {% else %}<span class="badge badge-warning">Sin resp.</span>{% endif %}
           {% if q.is_corrected %}<span class="badge badge-neutral">Corregida</span>{% endif %}
         </div>
       </div>
-      <div class="data-list-cell" data-label="Acciones">
-        <div class="flex gap-2 flex-wrap justify-end">
+      <div class="data-list-cell" data-label="Acciones" style="min-width: 0;">
+        <div class="flex gap-2 flex-wrap" style="justify-content: flex-end;">
           <a href="/questions/{{ q.id }}" class="btn btn-ghost btn-sm">Ver</a>
           {% if not q.is_corrected %}<a href="/questions/{{ q.id }}/correct" class="btn btn-outline btn-sm">Corregir</a>{% endif %}
           <button type="button" class="btn btn-danger btn-sm"
