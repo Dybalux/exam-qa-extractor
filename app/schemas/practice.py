@@ -62,10 +62,15 @@ class ResponseRecord(BaseModel):
     """Single question response record within session results."""
 
     question_id: int
+    question_text: str | None = None
     selected_answer_id: int | None
+    selected_answer_text: str | None = None
     is_correct: bool | None
+    correct_answer_text: str | None = None
+    explanation: str | None = None
     time_spent_seconds: int
     was_flagged: bool
+    skipped: bool = False
 
 
 class SessionResults(BaseModel):

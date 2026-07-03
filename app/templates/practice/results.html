@@ -43,7 +43,59 @@
     </div>
   </div>
 
-  <div class="flex gap-3 justify-between">
+  {# ── Per-question breakdown ── #}
+  <h2 class="mb-4" style="font-size:1.25rem; font-weight:700">Desglose por pregunta</h2>
+
+  {% for r in results.responses %}
+  <div class="card mb-6" style="border-left:4px solid {% if r.is_correct %}var(--success){% elif r.skipped %}var(--text-muted){% else %}var(--danger){% endif %}">
+    <div class="card-body" style="padding:20px">
+      {# Header: question number + result badge #}
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-sm text-muted" style="font-weight:500">Pregunta {{ loop.index }}</span>
+        <span class="badge {% if r.is_correct %}badge-success{% elif r.skipped %}badge-neutral{% else %}badge-danger{% endif %}" style="font-size:0.8rem">
+          {% if r.is_correct %}✓ Correcta{% elif r.skipped %}Saltada{% else %}✗ Incorrecta{% endif %}
+        </span>
+      </div>
+
+      {# Question text #}
+      <p style="font-size:0.95rem; line-height:1.6; margin-bottom:16px">{{ r.question_text }}</p>
+
+      {% if r.skipped %}
+      {# Skipped — no answers to show #}
+      <p class="text-sm text-muted" style="font-style:italic">No respondida</p>
+
+      {% elif r.is_correct %}
+      {# Correct — show what they picked #}
+      <div style="padding: 10px 14px; margin-bottom:8px; background: rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.2); border-radius:var(--radius)">
+        <span class="text-xs text-muted" style="display:block; margin-bottom:4px">Tu respuesta</span>
+        <span style="color:var(--success-light); font-weight:600">{{ r.selected_answer_text }}</span>
+      </div>
+
+      {% else %}
+      {# Incorrect — show their answer, correct answer, and explanation #}
+      <div style="padding: 10px 14px; margin-bottom:12px; background: rgba(248,81,73,0.08); border:1px solid rgba(248,81,73,0.2); border-radius:var(--radius)">
+        <span class="text-xs text-muted" style="display:block; margin-bottom:4px">Tu respuesta</span>
+        <span style="color:var(--danger-light); font-weight:600">{{ r.selected_answer_text }}</span>
+      </div>
+
+      <div style="padding: 10px 14px; margin-bottom:12px; background: rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.2); border-radius:var(--radius)">
+        <span class="text-xs text-muted" style="display:block; margin-bottom:4px">Respuesta correcta</span>
+        <span style="color:var(--success-light); font-weight:600">{{ r.correct_answer_text }}</span>
+      </div>
+
+        {% if r.explanation %}
+        <div style="padding: 10px 14px; background: rgba(210,168,0,0.06); border:1px solid rgba(210,168,0,0.15); border-radius:var(--radius)">
+          <span class="text-xs text-muted" style="display:block; margin-bottom:4px">💡 Explicación</span>
+          <span style="color:var(--warning-light); font-size:0.9rem; line-height:1.6">{{ r.explanation }}</span>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {# Bottom actions #}
+  <div class="flex gap-3 justify-between" style="margin-top:24px">
     <a href="/analytics/weak-areas" class="btn btn-outline">🔍 Ver áreas débiles</a>
     <a href="/practice" class="btn btn-primary">▶ Practicar de nuevo</a>
   </div>

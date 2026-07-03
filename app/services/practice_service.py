@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.constants import AnswerType, PracticeMode
 from app.core.exceptions import NotFoundError, ValidationError
@@ -354,6 +355,9 @@ class PracticeService:
     async def get_session_results(self, session_id: int) -> dict:
         """Get full results for a completed or in-progress session.
 
+        Includes per-question detail: question text, selected answer,
+        correct answer, and explanation for incorrect responses.
+
         Args:
             session_id: Session ID
 
@@ -366,7 +370,12 @@ class PracticeService:
         practice_session = await self.get_session(session_id)
 
         responses_result = await self.session.execute(
-            select(PracticeResponse).where(PracticeResponse.session_id == session_id)
+            select(PracticeResponse)
+            .options(
+                selectinload(PracticeResponse.question).selectinload(Question.answers),
+                selectinload(PracticeResponse.selected_answer),
+            )
+            .where(PracticeResponse.session_id == session_id)
         )
         responses = responses_result.scalars().all()
 
@@ -382,15 +391,35 @@ class PracticeService:
             "accuracy": practice_session.accuracy,
             "total_time_seconds": practice_session.total_time_seconds,
             "responses": [
-                {
-                    "question_id": r.question_id,
-                    "selected_answer_id": r.selected_answer_id,
-                    "is_correct": r.is_correct,
-                    "time_spent_seconds": r.time_spent_seconds,
-                    "was_flagged": r.was_flagged,
-                }
+                self._build_response_detail(r)
                 for r in responses
             ],
+        }
+
+    def _build_response_detail(self, r: PracticeResponse) -> dict:
+        """Build a detailed per-response dict with question and answer context.
+
+        Args:
+            r: PracticeResponse instance with eager-loaded relationships
+
+        Returns:
+            Dict with full question/answer detail for the results page
+        """
+        question = r.question
+        selected = r.selected_answer
+        correct = question.correct_answer if question else None
+
+        return {
+            "question_id": r.question_id,
+            "question_text": question.question_text if question else None,
+            "selected_answer_id": r.selected_answer_id,
+            "selected_answer_text": selected.answer_text if selected else None,
+            "is_correct": r.is_correct,
+            "correct_answer_text": correct.answer_text if correct else None,
+            "explanation": correct.explanation if correct else None,
+            "time_spent_seconds": r.time_spent_seconds,
+            "was_flagged": r.was_flagged,
+            "skipped": r.selected_answer_id is None,
         }
 
     # ------------------------------------------------------------------
