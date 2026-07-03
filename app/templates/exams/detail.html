@@ -8,6 +8,7 @@
   </p>
 {% endblock %}
 {% block page_actions %}
+  <a href="/" class="btn btn-ghost">Dashboard</a>
   <a href="/exams/{{ exam.id }}/questions/new" class="btn btn-outline">+ Agregar pregunta</a>
   <a href="/exams/{{ exam.id }}/upload?return_to=/exams/{{ exam.id }}" class="btn btn-ghost">↑ Subir imagen</a>
   <a href="/exams/{{ exam.id }}/edit" class="btn btn-ghost">Editar</a>

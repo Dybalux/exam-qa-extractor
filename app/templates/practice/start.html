@@ -3,8 +3,17 @@
 {% block page_title %}Iniciar práctica{% endblock %}
 {% block page_subtitle %}<p class="page-subtitle">Configurá tu sesión de estudio</p>{% endblock %}
 
+{% block extra_styles %}
+<style>
+  .page-header { text-align: center; }
+  .page-title { display: block; margin-bottom: 8px; }
+  .page-subtitle { justify-content: center; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:520px">
+<div style="display:flex; justify-content:center">
+  <div class="card" style="max-width:520px; width:100%">
   <div class="card-body">
     <form method="POST" action="/practice">
       <div class="form-group">

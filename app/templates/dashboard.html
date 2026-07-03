@@ -103,7 +103,7 @@
         <span class="text-muted text-xs">{{ exam.topic_tags or '—' }}</span>
       </div>
       <div class="data-list-cell" data-label="Preguntas">
-        <a href="/exams/{{ exam.id }}">Ver detalle →</a>
+        <span class="text-secondary">{{ exam.questions|length if exam.questions else 0 }}</span>
       </div>
       <div class="data-list-cell" data-label="Acciones">
         <div class="flex gap-2 justify-end">
@@ -122,7 +122,7 @@
 {# Backup / restore card. The controls are wired in               #}
 {# app/static/js/import-export.js (T3.4). The IDs are the contract  #}
 {# between this template and the JS module.                        #}
-<div class="card mt-6">
+<div class="card" style="margin-top:32px">
   <div class="card-header">
     <h3 class="card-title">Importar backup</h3>
   </div>
