@@ -1,6 +1,7 @@
 FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app
 
 # Stage 1: system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Stage 2: Python deps (cached independently of source)
 WORKDIR /app
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 RUN pip install --no-cache-dir .          # production-only; skips [dev]
 
 # Stage 3: non-root user (UID 1000)
@@ -22,10 +23,10 @@ COPY --chown=app:app app/            /app/app/
 RUN chmod +x /app/docker/entrypoint.sh
 
 # Stage 5: runtime
-USER app
-EXPOSE 8000
 RUN mkdir -p /app/data/db /app/data/uploads /app/data/backups \
     && chown -R app:app /app/data
+USER app
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
   CMD python -c "import urllib.request,sys; \

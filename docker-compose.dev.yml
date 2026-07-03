@@ -13,6 +13,7 @@ services:
       - app_data:/app/data          # named volume → DB + uploads survive restarts
     environment:
       DEBUG: "true"
+      DATABASE_URL: "sqlite+aiosqlite:////app/data/db/database.db"
     command:
       - uvicorn
       - app.main:app

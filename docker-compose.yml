@@ -5,6 +5,8 @@ services:
     container_name: exam-qa-extractor
     ports: ["8000:8000"]
     env_file: [.env]
+    environment:
+      DATABASE_URL: "sqlite+aiosqlite:////app/data/db/database.db"
     volumes:
       - ./data/db:/app/data/db
       - ./data/uploads:/app/data/uploads
