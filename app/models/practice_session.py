@@ -21,7 +21,7 @@ class PracticeSession(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "mode IN ('random', 'by_partial', 'by_topic', 'exam_simulation')",
+            "mode IN ('random', 'by_partial', 'by_topic', 'exam_simulation', 'error_review')",
             name="check_valid_practice_mode",
         ),
         Index("idx_session_user", "user_session_id"),

@@ -36,6 +36,7 @@ class PracticeMode(str, Enum):
     BY_PARTIAL = "by_partial"
     BY_TOPIC = "by_topic"
     EXAM_SIMULATION = "exam_simulation"
+    ERROR_REVIEW = "error_review"
 
 
 class OCRStatus(str, Enum):

@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api._flash import redirect_with_flash
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.dependencies import (
     get_all_topics,
     get_analytics_service,
@@ -613,13 +613,23 @@ async def practice_create(
     user_session_id = _session_id(request)
     exam_id = int(form["exam_id"]) if form.get("exam_id") else None
     topic = form.get("topic") or None
-    session = await service.create_session(
-        user_session_id=user_session_id,
-        mode=form.get("mode", "random"),
-        exam_id=exam_id,
-        filters={"topic": topic} if topic else None,
-        total_questions=int(form.get("total_questions", 10)),
-    )
+    try:
+        session = await service.create_session(
+            user_session_id=user_session_id,
+            mode=form.get("mode", "random"),
+            exam_id=exam_id,
+            filters={"topic": topic} if topic else None,
+            total_questions=int(form.get("total_questions", 10)),
+        )
+    except ValidationError:
+        # Only the error_review case warrants the friendly flash redirect;
+        # other validation failures (invalid mode, out-of-range totals, no
+        # questions for filters) should surface via normal error handling.
+        if form.get("mode") == "error_review":
+            return redirect_with_flash(
+                "/practice", "Todavía no tenés errores para revisar.", "warning"
+            )
+        raise
     response = RedirectResponse(url=f"/practice/{session.id}/play", status_code=303)
     response.set_cookie("session_id", user_session_id, max_age=86400)
     return response

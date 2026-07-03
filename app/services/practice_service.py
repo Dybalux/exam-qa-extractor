@@ -69,11 +69,27 @@ class PracticeService:
                 details={"total_questions": total_questions},
             )
 
+        # Error review mode: pre-filter pool to previously failed questions
+        question_ids = None
+        if mode == PracticeMode.ERROR_REVIEW.value:
+            question_ids = await self._get_failed_question_ids(user_session_id)
+            # Early guard: no prior failures means error_review has nothing to
+            # review. Raise explicitly rather than relying on the empty-list
+            # filter behaviour in _get_available_questions.
+            if not question_ids:
+                raise ValidationError(
+                    "No questions with previous errors found.",
+                )
+
         available = await self._get_available_questions(
-            exam_id=exam_id, filters=filters or {}
+            exam_id=exam_id, filters=filters or {}, question_ids=question_ids
         )
 
         if not available:
+            if mode == PracticeMode.ERROR_REVIEW.value:
+                raise ValidationError(
+                    "No questions with previous errors found.",
+                )
             raise ValidationError(
                 "No questions available for the selected filters. "
                 "Ensure questions have at least one correct answer.",
@@ -193,9 +209,17 @@ class PracticeService:
         )
         answered_ids = set(answered_result.scalars().all())
 
+        # For error_review mode, recompute failed question IDs
+        question_ids = None
+        if practice_session.mode == PracticeMode.ERROR_REVIEW.value:
+            question_ids = await self._get_failed_question_ids(
+                practice_session.user_session_id
+            )
+
         available = await self._get_available_questions(
             exam_id=practice_session.exam_id,
             filters=practice_session.filters or {},
+            question_ids=question_ids,
         )
 
         remaining = [q for q in available if q.id not in answered_ids]
@@ -430,12 +454,14 @@ class PracticeService:
         self,
         exam_id: int | None,
         filters: dict,
+        question_ids: list[int] | None = None,
     ) -> list[Question]:
         """Fetch questions that are ready for practice, applying filters.
 
         Args:
             exam_id: Optional exam ID filter
             filters: Dict with optional keys: topic
+            question_ids: Optional list of question IDs to restrict results to
 
         Returns:
             List of ready-for-practice questions
@@ -448,8 +474,36 @@ class PracticeService:
         if topic := filters.get("topic"):
             query = query.where(Question.topic == topic)
 
+        if question_ids is not None:
+            query = query.where(Question.id.in_(question_ids))
+
         result = await self.session.execute(query)
         all_questions = result.scalars().all()
 
         # is_ready_for_practice requires loaded answers (selectin on model)
         return [q for q in all_questions if q.is_ready_for_practice]
+
+    async def _get_failed_question_ids(self, user_session_id: str) -> list[int]:
+        """Return deduplicated IDs of questions this user has ever answered
+        incorrectly.
+
+        Joins ``PracticeResponse`` to ``PracticeSession`` on ``session_id``,
+        filters by ``user_session_id`` and ``is_correct = False``, and
+        returns the distinct ``question_id`` values.
+
+        Args:
+            user_session_id: Browser/user session identifier
+
+        Returns:
+            List of question IDs the user has answered incorrectly
+        """
+        result = await self.session.execute(
+            select(PracticeResponse.question_id)
+            .distinct()
+            .join(PracticeSession, PracticeResponse.session_id == PracticeSession.id)
+            .where(
+                PracticeSession.user_session_id == user_session_id,
+                PracticeResponse.is_correct == False,  # noqa: E712
+            )
+        )
+        return list(result.scalars().all())

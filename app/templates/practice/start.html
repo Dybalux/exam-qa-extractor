@@ -24,6 +24,7 @@
             ('by_partial',      '📋 Por parcial',         'Enfocate en un examen específico'),
             ('by_topic',        '🏷 Por tema',            'Practicá un tema de SO en particular'),
             ('exam_simulation', '⏱ Simulacro de parcial','Reproduce la condición real del examen'),
+            ('error_review',    '🔁 Errores',             'Preguntas que alguna vez respondiste mal'),
           ] %}
           <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:border-color var(--t)">
             <input type="radio" name="mode" value="{{ mode }}" {% if mode == 'random' %}checked{% endif %}
