@@ -3,6 +3,8 @@
 Covers SDD change ``fix-exam-list-and-edit-navigation`` tasks 5.1–5.3.
 """
 
+import io
+import logging
 import urllib.parse
 from pathlib import Path
 
@@ -358,6 +360,17 @@ async def test_upload_exam_image_with_valid_return_to_redirects_to_return_to(
     assert location.startswith(f"/exams/{exam_id}?")
     assert "exam_id=" in location
 
+    # REQ-TYPE-1: file_data MUST be a binary stream, not raw bytes.
+    storage_mock.save_file.assert_called_once()
+    call_kwargs = storage_mock.save_file.call_args.kwargs
+    file_data = call_kwargs.get("file_data")
+    assert file_data is not None, "save_file was not called with file_data kwarg"
+    assert isinstance(file_data, io.IOBase), (
+        f"Expected BinaryIO stream, got {type(file_data)}"
+    )
+    assert hasattr(file_data, "read"), "stream must have 'read' method"
+    assert hasattr(file_data, "seek"), "stream must have 'seek' method"
+
 
 @pytest.mark.asyncio
 async def test_upload_exam_image_without_return_to_uses_default_redirect(
@@ -421,6 +434,17 @@ async def test_upload_exam_image_without_return_to_uses_default_redirect(
     assert location.startswith("/search/needs-review?")
     assert f"exam_id={exam_id}" in location
 
+    # REQ-TYPE-1: file_data MUST be a binary stream, not raw bytes.
+    storage_mock.save_file.assert_called_once()
+    call_kwargs = storage_mock.save_file.call_args.kwargs
+    file_data = call_kwargs.get("file_data")
+    assert file_data is not None, "save_file was not called with file_data kwarg"
+    assert isinstance(file_data, io.IOBase), (
+        f"Expected BinaryIO stream, got {type(file_data)}"
+    )
+    assert hasattr(file_data, "read"), "stream must have 'read' method"
+    assert hasattr(file_data, "seek"), "stream must have 'seek' method"
+
 
 # ── 5.2c Upload endpoint OCR-failure integration test ─────────
 
@@ -429,12 +453,14 @@ async def test_upload_exam_image_without_return_to_uses_default_redirect(
 async def test_upload_exam_image_ocr_failure_redirects_with_warning(
     client: AsyncClient,
     default_subject,
+    caplog: pytest.LogCaptureFixture,
 ):
     """POST /api/v1/exams/{id}/upload with OCR failure → 303 with warning flash.
 
     Storage succeeds (file is saved), but OCR raises OCRProcessingError.
     The file MUST already be persisted on disk.
     The redirect MUST carry the "Archivo guardado pero OCR falló" flash.
+    A warning MUST be logged with the storage path and error (REQ-TYPE-1 sc.2).
     """
     from unittest.mock import AsyncMock, MagicMock
 
@@ -463,16 +489,17 @@ async def test_upload_exam_image_ocr_failure_redirects_with_warning(
 
     app.dependency_overrides[get_storage_service] = lambda: storage_mock
     app.dependency_overrides[get_ocr_service] = lambda: ocr_mock
-    try:
-        response = await client.post(
-            f"/api/v1/exams/{exam_id}/upload",
-            files={"file": ("test.png", b"fake-image-data", "image/png")},
-            data={"language": "spa"},
-            follow_redirects=False,
-        )
-    finally:
-        app.dependency_overrides.pop(get_storage_service, None)
-        app.dependency_overrides.pop(get_ocr_service, None)
+    with caplog.at_level(logging.WARNING, logger="app.api.exams"):
+        try:
+            response = await client.post(
+                f"/api/v1/exams/{exam_id}/upload",
+                files={"file": ("test.png", b"fake-image-data", "image/png")},
+                data={"language": "spa"},
+                follow_redirects=False,
+            )
+        finally:
+            app.dependency_overrides.pop(get_storage_service, None)
+            app.dependency_overrides.pop(get_ocr_service, None)
 
     assert response.status_code == 303
     location = response.headers["location"]
@@ -481,3 +508,49 @@ async def test_upload_exam_image_ocr_failure_redirects_with_warning(
 
     # Storage.save_file was called (file persisted on disk).
     storage_mock.save_file.assert_called_once()
+
+    # REQ-TYPE-1 sc.2: a warning is logged with the storage path and error.
+    assert len(caplog.records) >= 1, "Expected at least one warning log"
+    warning_messages = [
+        r.message for r in caplog.records if r.levelno >= logging.WARNING
+    ]
+    assert any("OCR failed" in msg for msg in warning_messages), (
+        f"Expected OCR-failure warning, got: {warning_messages}"
+    )
+    assert any(
+        str(upload_result_mock.storage_path) in msg for msg in warning_messages
+    ), f"Expected storage path in warning, got: {warning_messages}"
+
+
+# ── Form UploadFile guard integration test ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_exam_create_with_file_in_text_field_uses_default(
+    client: AsyncClient,
+):
+    """POST /exams/new with a file under ``partial_number`` → 303, no 500.
+
+    Production multipart parsing (Starlette MultiPartParser) instantiates
+    ``starlette.datastructures.UploadFile`` — NOT ``fastapi.UploadFile``.
+    The ``_form_str`` guard must match the base class so a file value
+    under a text-field name falls back to the default instead of raising
+    ``int(\"<UploadFile repr>\")`` → ValueError → 500.
+    """
+    response = await client.post(
+        "/exams/new",
+        files={
+            "partial_number": ("evil.exe", b"123", "application/octet-stream"),
+        },
+        data={
+            "exam_date": "2025-07-22",
+            "topic_tags": "test",
+        },
+        follow_redirects=False,
+    )
+    # No 500: the UploadFile guard fires and returns default "1".
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.startswith("/exams?")
+    decoded = urllib.parse.unquote(location)
+    assert "Examen guardado" in decoded

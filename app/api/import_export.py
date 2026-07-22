@@ -88,7 +88,11 @@ async def export_full_db(
     )
 
 
-@router.post("/import", status_code=200, response_model=None)
+@router.post(
+    "/import",
+    status_code=200,
+    response_model=ImportPreviewSchema | ImportApplyResultSchema,
+)
 async def import_envelope(
     response: Response,
     file: UploadFile = File(...),

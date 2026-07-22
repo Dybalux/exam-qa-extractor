@@ -5,9 +5,10 @@ import uuid
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import UploadFile
 
 from app.api._flash import redirect_with_flash
 from app.core.exceptions import NotFoundError, ValidationError

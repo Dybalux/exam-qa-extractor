@@ -6,7 +6,7 @@ Covers SDD change ``fix-mypy-baseline`` REQ-TYPE-2 scenarios.
 import io
 
 import pytest
-from fastapi import UploadFile
+from starlette.datastructures import UploadFile
 
 from app.api.pages import _form_str, _form_str_or_none
 
