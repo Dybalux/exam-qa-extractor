@@ -1,18 +1,33 @@
 project:
   name: "exam-study-system"
+  repo: "exam-qa-extractor"
   stack:
     backend: "FastAPI"
-    orm: "SQLAlchemy >= 2.0.0"
+    orm: "SQLAlchemy >= 2.0.0 (async)"
     database: "aiosqlite (SQLite)"
     validation: "Pydantic >= 2.5.0"
     templates: "Jinja2 HTML"
-    current_ocr: "pytesseract"
-    target_ocr: "gpt-4o-mini (OpenAI Vision)"
+    ocr: "pytesseract"
+    image_processing: "opencv-python-headless, Pillow, pymupdf"
+    logging: "structlog"
   testing:
-    framework: "pytest"
+    framework: "pytest 8.x"
+    runner_command: "uv run pytest"
+    asyncio_mode: "auto"
     strict_tdd: false
     capabilities_detected: true
-    test_files_present: false
+    test_files_present: true
+    layers:
+      unit: true
+      integration: true
+      e2e: false
+    coverage:
+      available: true
+      command: "uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=20"
+    quality:
+      linter: "ruff check app tests"
+      type_checker: "mypy app"
+      formatter: "ruff format --check app tests"
   sdd_preferences:
     execution_mode: "interactive"
     artifact_store: "openspec"

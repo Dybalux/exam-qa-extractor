@@ -48,6 +48,7 @@
 | `415189e` | feat(ui): center form cards, update cancel links, add unsaved modal markup |
 | `402b359` | feat(js): hoist toast helpers, add dirty tracking, unsaved modal, reorder fetch |
 | `5fc8da3` | test: add redirect target tests, amend reorder degradation spec |
+| `07230a2` | fix: address judgment-day findings (cache-bust, focus traps, return_to producer, test coverage) |
 
 ## Files Changed
 | File | Changes |
@@ -68,6 +69,27 @@
 | `openspec/.../specs/form-interaction/spec.md` | Modified — spec amendment |
 
 ## Test Results
-- All 134 tests pass (123 pre-existing + 11 new)
+- All 137 tests pass (134 pre-existing + 3 new: answer redirect, upload return_to valid, upload return_to default)
 - ruff check: all passed
-- mypy: 44 pre-existing errors, 0 new errors introduced
+- mypy: 80 pre-existing errors, 0 new errors introduced
+
+## Judgment-Day Fixes (commit `07230a2`)
+| ID | Finding | Fix |
+|----|---------|-----|
+| C1 | JS cache-buster not bumped | `base.html` `?v=3` -> `?v=4` |
+| C2 | Missing answer create/edit redirect test | Added `test_answer_create_redirects_to_parent_question` |
+| C3 | Buggy OCR-correction test assertion | Decode full location, assert exact flash message |
+| S1 | Focus trap escapes after pointer click | `trapFocus` pulls focus back inside modal when `activeElement` is outside |
+| S2 | `return_to` dead code (no producer) | Added `?return_to=` to upload links in `exams/detail.html` and `list.html` |
+| S3 | Delete-modal focus trap inert when confirmBtn disabled | Focus close button instead of disabled confirm button |
+| S4 | Missing endpoint-level return_to test + misleading docstring | Added 2 upload endpoint tests + fixed docstring |
+| G1 | Dead code in exam-edit redirect test | Removed orphaned `create_resp`/`list_resp` block |
+| G2 | Dead no-op guard `link.type === 'submit'` | Removed guard from cancel-link interceptor |
+
+### Follow-up note (S2)
+The `?return_to=/exams` producer on `exams/list.html` is added as instructed,
+but `/exams` (without ID) is not in the `_validate_return_to` allowlist
+(only `/search/needs-review` and `/exams/{id}` are allowed). The list-page
+return_to will be rejected by the current validator and fall back to the
+default redirect. The `exams/detail.html` links (`?return_to=/exams/{id}`)
+work correctly. `manual_form.html:97` left untouched per instructions.
