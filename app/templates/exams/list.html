@@ -33,7 +33,7 @@
       </div>
       <div class="data-list-cell" data-label="Tags">
         {% if exam.topic_tags %}
-          <div class="flex gap-2 flex-wrap">
+          <div class="flex gap-2 flex-wrap items-center">
           {% for tag in exam.topic_tags.split(',') %}
             <span class="badge badge-neutral">{{ tag.strip() }}</span>
           {% endfor %}
