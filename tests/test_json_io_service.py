@@ -630,9 +630,7 @@ async def test_preview_caps_preview_list_at_50_entries(
     db_session.add(exam)
     await db_session.flush()
     for i in range(60):
-        db_session.add(
-            Question(exam_id=exam.id, question_text=f"Q{i}", topic_id=tid)
-        )
+        db_session.add(Question(exam_id=exam.id, question_text=f"Q{i}", topic_id=tid))
     await db_session.commit()
 
     payload = _envelope_dict([])  # empty JSON → all 60 are orphans

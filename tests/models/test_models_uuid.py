@@ -70,8 +70,9 @@ async def test_exam_auto_generates_uuid(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_two_exams_get_distinct_uuids(session: AsyncSession) -> None:
     subject_id, _ = await _seed_subject_and_topic(session)
-    a, b = Exam(partial_number=1, subject_id=subject_id), Exam(
-        partial_number=2, subject_id=subject_id
+    a, b = (
+        Exam(partial_number=1, subject_id=subject_id),
+        Exam(partial_number=2, subject_id=subject_id),
     )
     session.add_all([a, b])
     await session.commit()

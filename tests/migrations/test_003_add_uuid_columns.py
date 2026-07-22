@@ -63,9 +63,7 @@ def seeded_db(tmp_path: Path) -> Path:
             ),
             {"sid": subject_id},
         )
-        top_row = conn.execute(
-            text("SELECT id FROM topics WHERE slug='other'")
-        ).first()
+        top_row = conn.execute(text("SELECT id FROM topics WHERE slug='other'")).first()
         topic_id = top_row[0]
 
     # Mirror 002's net effect: drop the difficulty column. SQLite needs

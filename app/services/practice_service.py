@@ -414,10 +414,7 @@ class PracticeService:
             "skipped_count": practice_session.skipped_count,
             "accuracy": practice_session.accuracy,
             "total_time_seconds": practice_session.total_time_seconds,
-            "responses": [
-                self._build_response_detail(r)
-                for r in responses
-            ],
+            "responses": [self._build_response_detail(r) for r in responses],
         }
 
     def _build_response_detail(self, r: PracticeResponse) -> dict:
