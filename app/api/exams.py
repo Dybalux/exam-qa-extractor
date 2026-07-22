@@ -1,5 +1,6 @@
 """Exam API routes."""
 
+import io
 import logging
 import re
 import urllib.parse
@@ -185,14 +186,14 @@ async def upload_exam_image(
     try:
         # Save file first
         upload_result = await storage_svc.save_file(
-            file_data=await file.read(),
+            file_data=io.BytesIO(await file.read()),
             original_filename=file.filename,
             exam_id=exam_id,
         )
 
         try:
             # Process OCR
-            ocr_result = await ocr_svc.process_image(upload_result.absolute_path)
+            ocr_result = await ocr_svc.extract_from_path(upload_result.storage_path)
         except Exception as ocr_err:
             # OCR failed but file was saved - redirect with warning
             logger.warning(f"OCR failed for {upload_result.storage_path}: {ocr_err}")

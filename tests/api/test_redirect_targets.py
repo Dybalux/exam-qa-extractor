@@ -4,6 +4,7 @@ Covers SDD change ``fix-exam-list-and-edit-navigation`` tasks 5.1–5.3.
 """
 
 import urllib.parse
+from pathlib import Path
 
 import pytest
 from fastapi.responses import RedirectResponse
@@ -321,11 +322,11 @@ async def test_upload_exam_image_with_valid_return_to_redirects_to_return_to(
     # Mock storage + OCR at the dependency boundary.
     storage_mock = MagicMock()
     upload_result_mock = MagicMock()
-    upload_result_mock.absolute_path = "/tmp/test-upload.png"
+    upload_result_mock.storage_path = Path("/tmp/test-upload.png")
     storage_mock.save_file = AsyncMock(return_value=upload_result_mock)
 
     ocr_mock = MagicMock()
-    ocr_mock.process_image = AsyncMock(
+    ocr_mock.extract_from_path = AsyncMock(
         return_value=OCRResult(
             full_text="¿Pregunta?",
             questions=[
@@ -384,11 +385,11 @@ async def test_upload_exam_image_without_return_to_uses_default_redirect(
 
     storage_mock = MagicMock()
     upload_result_mock = MagicMock()
-    upload_result_mock.absolute_path = "/tmp/test-upload.png"
+    upload_result_mock.storage_path = Path("/tmp/test-upload.png")
     storage_mock.save_file = AsyncMock(return_value=upload_result_mock)
 
     ocr_mock = MagicMock()
-    ocr_mock.process_image = AsyncMock(
+    ocr_mock.extract_from_path = AsyncMock(
         return_value=OCRResult(
             full_text="¿Pregunta?",
             questions=[
@@ -419,3 +420,64 @@ async def test_upload_exam_image_without_return_to_uses_default_redirect(
     # Default: review queue (questions need review).
     assert location.startswith("/search/needs-review?")
     assert f"exam_id={exam_id}" in location
+
+
+# ── 5.2c Upload endpoint OCR-failure integration test ─────────
+
+
+@pytest.mark.asyncio
+async def test_upload_exam_image_ocr_failure_redirects_with_warning(
+    client: AsyncClient,
+    default_subject,
+):
+    """POST /api/v1/exams/{id}/upload with OCR failure → 303 with warning flash.
+
+    Storage succeeds (file is saved), but OCR raises OCRProcessingError.
+    The file MUST already be persisted on disk.
+    The redirect MUST carry the "Archivo guardado pero OCR falló" flash.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.core.exceptions import OCRProcessingError
+    from app.dependencies import get_ocr_service, get_storage_service
+    from app.main import app
+
+    _ = default_subject
+    api_create = await client.post(
+        "/api/v1/exams/",
+        json={"partial_number": 4, "topic_tags": "test"},
+    )
+    exam_id = api_create.json()["id"]
+
+    # Mock storage to succeed.
+    storage_mock = MagicMock()
+    upload_result_mock = MagicMock()
+    upload_result_mock.storage_path = Path("/tmp/test-upload.png")
+    storage_mock.save_file = AsyncMock(return_value=upload_result_mock)
+
+    # Mock OCR to raise OCRProcessingError.
+    ocr_mock = MagicMock()
+    ocr_mock.extract_from_path = AsyncMock(
+        side_effect=OCRProcessingError("Tesseract not available")
+    )
+
+    app.dependency_overrides[get_storage_service] = lambda: storage_mock
+    app.dependency_overrides[get_ocr_service] = lambda: ocr_mock
+    try:
+        response = await client.post(
+            f"/api/v1/exams/{exam_id}/upload",
+            files={"file": ("test.png", b"fake-image-data", "image/png")},
+            data={"language": "spa"},
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(get_storage_service, None)
+        app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 303
+    location = response.headers["location"]
+    decoded = urllib.parse.unquote(location)
+    assert "Archivo guardado pero OCR falló" in decoded
+
+    # Storage.save_file was called (file persisted on disk).
+    storage_mock.save_file.assert_called_once()
