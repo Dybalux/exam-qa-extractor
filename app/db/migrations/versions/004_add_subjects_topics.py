@@ -21,6 +21,8 @@ Create Date: 2026-06-30 00:00:00.000000
 
 from __future__ import annotations
 
+from typing import cast
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -57,14 +59,14 @@ def _table_exists(table: str) -> bool:
     return row is not None
 
 
-def _seed_subject(conn, uuid_str: str) -> int | None:
+def _seed_subject(conn: sa.Connection, uuid_str: str) -> int | None:
     """Insert the default subject if not present. Returns its id or None."""
     existing = conn.execute(
         sa.text("SELECT id FROM subjects WHERE slug = :slug"),
         {"slug": DEFAULT_SUBJECT_SLUG},
     ).first()
     if existing:
-        return existing[0]
+        return cast(int, existing[0])
     conn.execute(
         sa.text(
             "INSERT INTO subjects (uuid, name, slug, created_at, updated_at) "
@@ -79,7 +81,7 @@ def _seed_subject(conn, uuid_str: str) -> int | None:
     return row[0] if row else None
 
 
-def _seed_topics(conn, subject_id: int) -> None:
+def _seed_topics(conn: sa.Connection, subject_id: int) -> None:
     """Insert OS topics linked to *subject_id*, skipping those that already exist."""
     import uuid as _uuid
 
@@ -104,7 +106,7 @@ def _seed_topics(conn, subject_id: int) -> None:
         )
 
 
-def _backfill_topic_id(conn) -> None:
+def _backfill_topic_id(conn: sa.Connection) -> None:
     """Set questions.topic_id by matching questions.topic to topics.slug.
 
     Only updates rows where topic_id IS NULL, making the operation re-runnable.
@@ -120,7 +122,7 @@ def _backfill_topic_id(conn) -> None:
     )
 
 
-def _backfill_subject_id(conn, subject_id: int) -> None:
+def _backfill_subject_id(conn: sa.Connection, subject_id: int) -> None:
     """Set exams.subject_id to *subject_id* for rows where it is still NULL."""
     conn.execute(
         sa.text("UPDATE exams SET subject_id = :subject_id WHERE subject_id IS NULL"),
@@ -169,7 +171,7 @@ def upgrade() -> None:
     subject_id = _seed_subject(conn, subject_uuid)
 
     # 4. Seed topics.
-    _seed_topics(conn, subject_id)
+    _seed_topics(conn, cast(int, subject_id))
 
     # 5. Add topic_id column to questions.
     if "topic_id" not in _existing_columns("questions"):
@@ -181,7 +183,7 @@ def upgrade() -> None:
     if "subject_id" not in _existing_columns("exams"):
         with op.batch_alter_table("exams", schema=None) as batch_op:
             batch_op.add_column(sa.Column("subject_id", sa.Integer(), nullable=True))
-        _backfill_subject_id(conn, subject_id)
+        _backfill_subject_id(conn, cast(int, subject_id))
 
     # 7. Create indexes on the new FK columns.
     _create_index_if_missing("questions", "topic_id")

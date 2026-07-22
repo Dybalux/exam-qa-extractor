@@ -300,7 +300,7 @@ class OCRService:
             pix = page.get_pixmap(matrix=mat)
 
             # Convert to PIL Image
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
             doc.close()
 
             return img

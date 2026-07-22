@@ -56,6 +56,7 @@ dev = [
     # Code quality — ruff handles formatting too; black removed
     "ruff>=0.8.0,<1.0",
     "mypy>=1.13.0,<2.0",
+    "types-PyYAML>=6.0",
     "pre-commit>=3.5.0,<4.0",
 ]
 
@@ -114,8 +115,4 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "magic"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "cv2"
 ignore_missing_imports = true

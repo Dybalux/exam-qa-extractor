@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 from sqlalchemy import select
@@ -43,7 +44,7 @@ async def _load_seeds_config() -> dict:
         yaml.YAMLError: If the file is not valid YAML.
     """
     with open(_SEEDS_PATH, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return cast(dict[str, Any], yaml.safe_load(f))
 
 
 async def _seed_subjects_and_topics(session: AsyncSession) -> int:

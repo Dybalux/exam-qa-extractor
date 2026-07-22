@@ -50,7 +50,7 @@ def _verify_backfill(table: str, column: str) -> None:
     nulls = conn.execute(
         sa.text(f"SELECT COUNT(*) FROM {table} WHERE {column} IS NULL")
     ).scalar()
-    if nulls > 0:
+    if (nulls or 0) > 0:
         raise RuntimeError(
             f"Cannot apply migration: {nulls} row(s) in '{table}' "
             f"have NULL in '{column}'. Run migration 004 first to backfill."
