@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from app.models.answer import Answer
     from app.models.exam import Exam
     from app.models.question import Question
+    from app.models.subject import Subject
     from app.models.topic import Topic
 
 from app.core.exceptions import MalformedImportError, UnknownSchemaVersion
@@ -351,7 +352,9 @@ class JsonIOService:
         self._logger.info("dynamically created topic: %s", topic_slug)
         return topic
 
-    async def _resolve_default_subject(self, slug: str = "sistemas-operativos"):
+    async def _resolve_default_subject(
+        self, slug: str = "sistemas-operativos"
+    ) -> Subject:
         """Return the default Subject, creating it if it does not exist."""
         from app.models.subject import Subject
 
@@ -702,18 +705,22 @@ class JsonIOService:
                 topic_obj = await self._resolve_or_create_topic(
                     json_q.topic, topics_map
                 )
-                existing = question_map.get(json_q.uuid)
-                if existing is not None:
-                    if not self._question_matches_db(json_q, existing, existing.exam):
-                        existing.question_text = json_q.question_text
-                        existing.extracted_text = json_q.extracted_text
-                        existing.topic_id = topic_obj.id
-                        existing.order_in_exam = json_q.order_in_exam
-                        existing.is_corrected = json_q.is_corrected
-                        existing.correction_notes = json_q.correction_notes
-                        existing.has_code_in_answers = json_q.has_code_in_answers
-                        existing.image_id = json_q.image_id
-                        existing.confidence_score = json_q.confidence_score
+                existing_question = question_map.get(json_q.uuid)
+                if existing_question is not None:
+                    if not self._question_matches_db(
+                        json_q, existing_question, existing_question.exam
+                    ):
+                        existing_question.question_text = json_q.question_text
+                        existing_question.extracted_text = json_q.extracted_text
+                        existing_question.topic_id = topic_obj.id
+                        existing_question.order_in_exam = json_q.order_in_exam
+                        existing_question.is_corrected = json_q.is_corrected
+                        existing_question.correction_notes = json_q.correction_notes
+                        existing_question.has_code_in_answers = (
+                            json_q.has_code_in_answers
+                        )
+                        existing_question.image_id = json_q.image_id
+                        existing_question.confidence_score = json_q.confidence_score
                         updated += 1
                 else:
                     new_q = Question(
@@ -742,16 +749,16 @@ class JsonIOService:
             for json_q in parsed_questions:
                 parent_q = question_map[json_q.uuid]
                 for json_a in json_q.answers:
-                    existing = db_answer_by_uuid.get(json_a.uuid)
-                    if existing is not None:
-                        if not self._answer_matches_db(json_a, existing):
-                            existing.answer_text = json_a.answer_text
-                            existing.answer_type = json_a.answer_type
-                            existing.is_common_misconception = (
+                    existing_answer = db_answer_by_uuid.get(json_a.uuid)
+                    if existing_answer is not None:
+                        if not self._answer_matches_db(json_a, existing_answer):
+                            existing_answer.answer_text = json_a.answer_text
+                            existing_answer.answer_type = json_a.answer_type
+                            existing_answer.is_common_misconception = (
                                 json_a.is_common_misconception
                             )
-                            existing.explanation = json_a.explanation
-                            existing.display_order = json_a.display_order
+                            existing_answer.explanation = json_a.explanation
+                            existing_answer.display_order = json_a.display_order
                             updated += 1
                     else:
                         new_a = Answer(
