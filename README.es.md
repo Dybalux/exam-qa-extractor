@@ -29,7 +29,7 @@ El dashboard incluye controles de exportación/importación para mover datos de 
 
 ## Arquitectura
 
-Servicio FastAPI de un solo proceso. El navegador habla con páginas HTML (Jinja2) y una API JSON. Detrás de la API, una capa de servicios habla con SQLite, Tesseract OCR local, OpenAI Vision opcional, y el sistema de archivos.
+Servicio FastAPI de un solo proceso. El navegador carga una aplicación React de una sola página (servida por FastAPI desde `frontend/dist` en `/`) que habla con una API JSON. Detrás de la API, una capa de servicios habla con SQLite, Tesseract OCR local, OpenAI Vision opcional, y el sistema de archivos.
 
 ```mermaid
 graph LR
@@ -37,7 +37,7 @@ graph LR
 
     subgraph Container[Docker Container]
         direction TB
-        UI[Jinja2 Templates<br/>+ JS / CSS]
+        UI[React SPA<br/>Bun + Vite]
         API[FastAPI<br/>:8000]
         SVC[Service Layer<br/>OCR · Storage · JSON I/O<br/>Exam · Question · Practice]
         DB[(SQLite<br/>data/db)]
@@ -200,6 +200,16 @@ alembic -c app/alembic.ini upgrade head
 uvicorn app.main:app --reload
 ```
 
+7. Construye el frontend (requiere [Bun](https://bun.sh)); FastAPI sirve `frontend/dist` en `/`:
+```bash
+cd frontend && bun install && bun run build
+```
+Sin build la API arranca igual, pero `/` devuelve 404. Las imágenes Docker construyen el frontend automáticamente (`Dockerfile` multi-stage).
+
+Para desarrollar el frontend, deja el backend en el puerto 8000 y en otra terminal ejecuta `cd frontend && bun run dev`. Vite sirve la app en http://localhost:5173 y reenvía `/api` al backend.
+
+Las URLs antiguas `/app/...` redirigen a la misma ruta en la raíz.
+
 ## Desarrollo
 
 Ejecutar tests:
@@ -234,8 +244,7 @@ image_to_text/
 │   │   └── ...
 │   ├── models/         # Modelos SQLAlchemy
 │   ├── services/       # Lógica de negocio (incl. json_io_service.py)
-│   ├── templates/      # Templates Jinja2
-│   └── static/         # CSS, JS, imágenes
+├── frontend/           # SPA React 19 + Vite + TypeScript (Bun)
 ├── tests/              # Suite de tests
 ├── uploads/            # Subidas de archivos (creado en runtime)
 └── pyproject.toml      # Metadatos del proyecto y dependencias

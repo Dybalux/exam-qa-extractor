@@ -33,9 +33,6 @@ dependencies = [
     # Configuration
     "pyyaml>=6.0,<7.0",
 
-    # Templates
-    "jinja2>=3.1.2,<4.0",
-
     # Environment
     "python-dotenv>=1.0.0,<2.0",
 

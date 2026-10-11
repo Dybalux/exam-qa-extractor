@@ -31,7 +31,7 @@ The dashboard includes export/import controls to move exam data between environm
 
 ## Architecture
 
-Single-process FastAPI service. The browser talks to HTML pages (Jinja2) and a JSON API. Behind the API, a service layer talks to SQLite, local Tesseract OCR, optional OpenAI Vision, and the local filesystem.
+Single-process FastAPI service. The browser loads a React single-page app (served by FastAPI from `frontend/dist` at `/`) that talks to a JSON API. Behind the API, a service layer talks to SQLite, local Tesseract OCR, optional OpenAI Vision, and the local filesystem.
 
 ```mermaid
 graph LR
@@ -39,7 +39,7 @@ graph LR
 
     subgraph Container[Docker Container]
         direction TB
-        UI[Jinja2 Templates<br/>+ JS / CSS]
+        UI[React SPA<br/>built with Bun + Vite]
         API[FastAPI<br/>:8000]
         SVC[Service Layer<br/>OCR · Storage · JSON I/O<br/>Exam · Question · Practice]
         DB[(SQLite<br/>data/db)]
@@ -202,6 +202,16 @@ alembic -c app/alembic.ini upgrade head
 uvicorn app.main:app --reload
 ```
 
+7. Build the frontend (requires [Bun](https://bun.sh)); FastAPI serves `frontend/dist` at `/`:
+```bash
+cd frontend && bun install && bun run build
+```
+Without a build the API still starts, but `/` returns 404. Docker images build the frontend automatically (multi-stage `Dockerfile`).
+
+For frontend development run the backend on port 8000 and, in another terminal, `cd frontend && bun run dev`. Vite serves the app on http://localhost:5173 and proxies `/api` to the backend.
+
+Old `/app/...` URLs redirect to the same path at the root.
+
 ## Development
 
 Run tests:
@@ -236,8 +246,7 @@ image_to_text/
 │   │   └── ...
 │   ├── models/         # SQLAlchemy models
 │   ├── services/       # Business logic (incl. json_io_service.py)
-│   ├── templates/      # Jinja2 templates
-│   └── static/         # CSS, JS, images
+├── frontend/           # React 19 + Vite + TypeScript SPA (Bun)
 ├── tests/              # Test suite
 ├── uploads/            # File uploads (created at runtime)
 └── pyproject.toml      # Project metadata and dependencies

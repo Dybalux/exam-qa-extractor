@@ -10,3 +10,5 @@ __pycache__/ *.py[cod]
 .vscode/ .idea/ .DS_Store
 openspec/ .atl/
 README.es.md
+frontend/node_modules/
+frontend/dist/

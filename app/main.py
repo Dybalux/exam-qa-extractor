@@ -1,15 +1,16 @@
 """FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path, PurePosixPath
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import api_router
-from app.api.pages import router as pages_router
 from app.config import get_settings
 from app.core.exceptions import (
     ConflictError,
@@ -134,16 +135,9 @@ async def generic_domain_handler(request: Request, exc: ExamStudyError) -> JSONR
 
 
 # ---------------------------------------------------------------------------
-# Static files
-# ---------------------------------------------------------------------------
-
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-# ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
 
-app.include_router(pages_router)  # HTML views (no prefix)
 app.include_router(api_router, prefix="/api/v1")  # JSON API
 
 
@@ -156,3 +150,52 @@ app.include_router(api_router, prefix="/api/v1")  # JSON API
 async def health_check() -> dict:
     """Liveness probe."""
     return {"status": "ok", "version": "0.1.0"}
+
+
+# ---------------------------------------------------------------------------
+# React SPA (served at the site root)
+# ---------------------------------------------------------------------------
+
+# Paths owned by the backend. They must never fall back to index.html: an
+# unknown /api/... URL has to stay a real 404 for API clients.
+_BACKEND_ROOTS = {"api", "docs", "redoc", "openapi.json", "health"}
+
+
+class SPAStaticFiles(StaticFiles):
+    """StaticFiles that falls back to index.html for client-side routes.
+
+    Only extension-less paths (``/practice/3``) fall back; a missing asset such
+    as ``/missing.js`` keeps its real 404, and so does anything under the
+    backend-owned roots in ``_BACKEND_ROOTS``.
+    """
+
+    async def get_response(self, path: str, scope):  # type: ignore[no-untyped-def]
+        no_fallback = (
+            bool(PurePosixPath(path).suffix) or path.split("/", 1)[0] in _BACKEND_ROOTS
+        )
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404 or no_fallback:
+                raise
+            return await super().get_response("index.html", scope)
+        if response.status_code == 404 and not no_fallback:
+            return await super().get_response("index.html", scope)
+        return response
+
+
+@app.get("/app", include_in_schema=False)
+@app.get("/app/{path:path}", include_in_schema=False)
+async def legacy_app_prefix(request: Request, path: str = "") -> RedirectResponse:
+    """Old SPA URLs lived under /app; send them to the same path at the root."""
+    target = f"/{path}"
+    if request.url.query:
+        target += f"?{request.url.query}"
+    return RedirectResponse(url=target, status_code=308)
+
+
+# Built with `bun run build` in frontend/. Mounted last so every API route, the
+# docs and /health win; skipped when no build exists so the backend still starts.
+_SPA_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _SPA_DIST.is_dir():
+    app.mount("/", SPAStaticFiles(directory=_SPA_DIST, html=True), name="spa")

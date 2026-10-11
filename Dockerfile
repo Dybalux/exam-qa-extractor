@@ -1,3 +1,12 @@
+# ── Stage A: build the React SPA with Bun ────────────────────
+FROM oven/bun:1 AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY frontend/ ./
+RUN bun run build                          # → /frontend/dist
+
+# ── Stage B: runtime (FastAPI serves the API and the built SPA) ──
 FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -17,9 +26,11 @@ RUN pip install --no-cache-dir .          # production-only; skips [dev]
 RUN groupadd --gid 1000 app && useradd --uid 1000 --gid 1000 \
         --shell /bin/bash --create-home app
 
-# Stage 4: app code + migrations
+# Stage 4: app code + migrations + built frontend
 COPY --chown=app:app docker/entrypoint.sh /app/docker/entrypoint.sh
 COPY --chown=app:app app/            /app/app/
+# Built SPA: app/main.py serves /app/frontend/dist at the site root
+COPY --from=frontend --chown=app:app /frontend/dist /app/frontend/dist
 RUN chmod +x /app/docker/entrypoint.sh
 
 # Stage 5: runtime

@@ -79,3 +79,10 @@ parse_engram.py
 save_verify_report.py
 engram-export.json
 database_backup_*.json
+
+# Frontend (Bun/Vite)
+frontend/node_modules/
+frontend/dist/
+node_modules/
+SYSTEM_PRESENTATION.md
+.agents/skills/frontend-design/SKILL.md

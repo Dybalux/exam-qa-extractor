@@ -177,6 +177,7 @@ class ExamService:
         partial_number: int | None = None,
         exam_date: date | None = None,
         topic_tags: str | None = None,
+        clear_exam_date: bool = False,
     ) -> Exam:
         """Update exam metadata.
 
@@ -185,6 +186,8 @@ class ExamService:
             partial_number: New partial number 1-4 (optional)
             exam_date: New exam date (optional)
             topic_tags: New topic tags (optional)
+            clear_exam_date: Set the date to NULL (``exam_date=None`` alone
+                means "leave unchanged", so clearing must be explicit)
 
         Returns:
             Updated exam
@@ -194,7 +197,9 @@ class ExamService:
         if partial_number is not None:
             exam.partial_number = partial_number
 
-        if exam_date is not None:
+        if clear_exam_date:
+            exam.exam_date = None
+        elif exam_date is not None:
             exam.exam_date = exam_date
 
         if topic_tags is not None:

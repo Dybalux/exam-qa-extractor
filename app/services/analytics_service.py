@@ -261,6 +261,10 @@ class AnalyticsService:
             return {
                 "exam_id": exam_id,
                 "total_questions": 0,
+                "ready_for_practice": 0,
+                "corrected": 0,
+                "readiness_pct": 0.0,
+                "correction_pct": 0.0,
                 "by_topic": {},
             }
 

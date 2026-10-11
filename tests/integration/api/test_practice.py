@@ -1,4 +1,4 @@
-"""Integration tests for practice creation with error_review mode."""
+"""Integration tests for practice creation with error_review mode (SPA API)."""
 
 from datetime import datetime, timezone
 
@@ -14,6 +14,8 @@ from app.models.practice_response import PracticeResponse
 from app.models.practice_session import PracticeSession
 from app.models.question import Question
 from app.models.topic import Topic
+
+SESSIONS = "/api/v1/ui/practice/sessions"
 
 
 async def _get_other_topic(db_session: AsyncSession, default_subject) -> Topic:
@@ -105,42 +107,39 @@ async def test_error_review_with_failures_creates_session(
     )
     await db_session.commit()
 
-    # POST: create error_review session
+    # Create the error_review session through the SPA endpoint
     resp = await client.post(
-        "/practice",
-        data={"mode": "error_review", "total_questions": "10"},
-        follow_redirects=False,
+        SESSIONS, json={"mode": "error_review", "total_questions": 10}
     )
+    assert resp.status_code == 201, resp.text
+    session_id = resp.json()["session_id"]
 
-    assert resp.status_code == 303
-    assert "/practice/" in resp.headers["location"]
-    assert resp.headers["location"].endswith("/play")
+    current = (await client.get(f"{SESSIONS}/{session_id}/current")).json()
+    assert current["question"]["text"] == question.question_text
 
-    # The response sets a cookie — capture it for the redirect follow
-    new_cookies = resp.cookies
-    if new_cookies:
-        client.cookies.update(new_cookies)
-
-    # Follow redirect to play and verify the session contains our failed question
-    play_resp = await client.get(
-        resp.headers["location"],
-        follow_redirects=False,
+    # Answering it exhausts the pool: the never-failed question must NOT show
+    # up, which proves error_review restricts the pool to failed questions.
+    picked = current["question"]["answers"][0]["id"]
+    answered = await client.post(
+        f"{SESSIONS}/{session_id}/answer",
+        json={
+            "question_id": question.id,
+            "selected_answer_id": picked,
+            "time_spent_seconds": 1,
+        },
     )
-    assert play_resp.status_code == 200
-    assert question.question_text in play_resp.text
-    # The non-failed question must NOT appear — proves error_review
-    # restricts the pool to failed questions rather than returning any.
-    assert other_question.question_text not in play_resp.text
+    assert answered.status_code == 200
+    after = (await client.get(f"{SESSIONS}/{session_id}/current")).json()
+    assert after["question"] is None
 
 
 @pytest.mark.asyncio
-async def test_error_review_no_failures_flash_redirect(
+async def test_error_review_no_failures_is_friendly_422(
     client: AsyncClient,
     db_session: AsyncSession,
     default_subject,
 ) -> None:
-    """POST /practice with mode=error_review + no failures redirects to
-    /practice with flash message.
+    """Starting error_review with no failures returns a friendly 422.
 
     A ready question (with a correct answer) is seeded but has NO failed
     response, so the empty ``question_ids=[]`` path is exercised for real
@@ -175,24 +174,11 @@ async def test_error_review_no_failures_flash_redirect(
     await db_session.commit()
 
     resp = await client.post(
-        "/practice",
-        data={"mode": "error_review", "total_questions": "10"},
-        follow_redirects=False,
+        SESSIONS, json={"mode": "error_review", "total_questions": 10}
     )
 
-    assert resp.status_code == 303
-    location = resp.headers["location"]
-    assert "/practice" in location
-    # Flash message should be in query params
-    assert "message=Todav%C3%ADa" in location or "message=Todav%C3" in location
-
-    # Follow redirect and verify flash message appears on the page
-    follow = await client.get(
-        location,
-        follow_redirects=False,
-    )
-    assert follow.status_code == 200
-    assert "Todavía no tenés errores para revisar" in follow.text
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Todavía no tienes errores para revisar."
 
 
 @pytest.mark.asyncio
@@ -201,7 +187,7 @@ async def test_error_review_with_exam_filter(
     db_session: AsyncSession,
     default_subject,
 ) -> None:
-    """POST /practice with mode=error_review + exam_id filter restricts to
+    """Starting error_review with an exam_id filter restricts to
     failed questions from that exam only."""
     user_session_id = "int-test-user-2"
     client.cookies.set("session_id", user_session_id)
@@ -274,30 +260,17 @@ async def test_error_review_with_exam_filter(
     )
     await db_session.commit()
 
-    # POST with exam_id=E2 (no failures there) → should redirect with flash
+    # exam_id=E2 (no failures there) -> friendly 422
     resp2 = await client.post(
-        "/practice",
-        data={
-            "mode": "error_review",
-            "exam_id": str(exam2.id),
-            "total_questions": "10",
-        },
-        follow_redirects=False,
+        SESSIONS,
+        json={"mode": "error_review", "exam_id": exam2.id, "total_questions": 10},
     )
-    assert resp2.status_code == 303
-    assert "/practice" in resp2.headers["location"]
-    assert "message=" in resp2.headers["location"]
+    assert resp2.status_code == 422
+    assert "errores para revisar" in resp2.json()["detail"]
 
-    # POST with exam_id=E1 → should succeed and create session
+    # exam_id=E1 -> session is created
     resp1 = await client.post(
-        "/practice",
-        data={
-            "mode": "error_review",
-            "exam_id": str(exam1.id),
-            "total_questions": "10",
-        },
-        follow_redirects=False,
+        SESSIONS,
+        json={"mode": "error_review", "exam_id": exam1.id, "total_questions": 10},
     )
-    assert resp1.status_code == 303
-    assert "/practice/" in resp1.headers["location"]
-    assert resp1.headers["location"].endswith("/play")
+    assert resp1.status_code == 201
