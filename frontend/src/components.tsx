@@ -1,5 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, type LinkProps } from 'react-router-dom'
+import { ThemeToggle } from './ThemeToggle.tsx'
+
+export { ThemeToggle }
 
 // ── Button ────────────────────────────────────────────────
 type Variant = 'primary' | 'quiet' | 'danger'
@@ -115,6 +118,9 @@ export function Layout() {
           <NavLink to="/practice">Práctica</NavLink>
           <NavLink to="/analytics">Estadísticas</NavLink>
         </nav>
+        <div className="rail-foot">
+          <ThemeToggle />
+        </div>
       </aside>
       <main className="main">
         <Outlet />

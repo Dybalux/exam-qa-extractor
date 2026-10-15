@@ -2,7 +2,7 @@ export const MODE_INFO: Record<string, { label: string; hint: string }> = {
   random: { label: 'Aleatorio', hint: 'Preguntas de todos los exámenes al azar' },
   by_partial: { label: 'Por parcial', hint: 'Enfócate en un examen específico' },
   by_topic: { label: 'Por tema', hint: 'Practica un tema en particular' },
-  exam_simulation: { label: 'Simulacro de parcial', hint: 'Reproduce la condición real del examen' },
+  exam_simulation: { label: 'Simulacro de parcial', hint: '10 min cronometrados · Corrección diferida al entregar' },
   error_review: { label: 'Errores', hint: 'Preguntas que alguna vez respondiste mal' },
 }
 

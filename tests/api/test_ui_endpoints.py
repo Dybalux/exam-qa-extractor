@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.answer import Answer
@@ -211,3 +212,100 @@ async def test_unknown_session_is_404(client: AsyncClient) -> None:
     assert (
         await client.get(f"{BASE}/practice/sessions/999/results")
     ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_incorrect_answer_explanation_combination(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    questions = await _seed(db_session, n_questions=1)
+    q = questions[0]
+    answers_res = await db_session.execute(
+        select(Answer).where(Answer.question_id == q.id)
+    )
+    for a in answers_res.scalars().all():
+        if a.answer_type == "correct":
+            a.explanation = "Kernel saves A and restores B."
+        else:
+            a.explanation = "Incorrect because it ignores return step."
+    await db_session.commit()
+
+    session = await _start(client)
+    sid = session["session_id"]
+    current = (await client.get(f"{BASE}/practice/sessions/{sid}/current")).json()[
+        "question"
+    ]
+    wrong_id = _pick(current, "wrong")
+
+    fb = (
+        await client.post(
+            f"{BASE}/practice/sessions/{sid}/answer",
+            json={"question_id": q.id, "selected_answer_id": wrong_id},
+        )
+    ).json()
+
+    assert fb["is_correct"] is False
+    assert (
+        fb["explanation"]
+        == "Incorrect because it ignores return step.\n\nKernel saves A and restores B."
+    )
+
+
+@pytest.mark.asyncio
+async def test_ui_practice_complete_endpoint(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed(db_session, n_questions=2)
+    session = await _start(client)
+    sid = session["session_id"]
+
+    res = await client.post(f"{BASE}/practice/sessions/{sid}/complete")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_completed"] is True
+
+    # Calling complete on an already completed session is idempotent
+    res2 = await client.post(f"{BASE}/practice/sessions/{sid}/complete")
+    assert res2.status_code == 200
+    assert res2.json()["is_completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_exam_paper_endpoint_and_answer_change(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed(db_session, n_questions=3)
+    session = await _start(client, mode="exam_simulation", total_questions=3)
+    sid = session["session_id"]
+
+    res = await client.get(f"{BASE}/practice/sessions/{sid}/paper")
+    assert res.status_code == 200
+    paper = res.json()
+    assert len(paper["questions"]) == 3
+    assert paper["session"]["mode"] == "exam_simulation"
+
+    q1 = paper["questions"][0]
+    wrong_id = _pick(q1, "wrong")
+    right_id = _pick(q1, "right")
+
+    # Answer question 1 with wrong answer
+    ans_res = await client.post(
+        f"{BASE}/practice/sessions/{sid}/answer",
+        json={"question_id": q1["id"], "selected_answer_id": wrong_id},
+    )
+    assert ans_res.status_code == 200
+    assert ans_res.json()["session"]["incorrect_count"] == 1
+    assert ans_res.json()["session"]["correct_count"] == 0
+
+    # In exam_simulation mode, user navigates back and changes answer to right
+    change_res = await client.post(
+        f"{BASE}/practice/sessions/{sid}/answer",
+        json={"question_id": q1["id"], "selected_answer_id": right_id},
+    )
+    assert change_res.status_code == 200
+    assert change_res.json()["session"]["correct_count"] == 1
+    assert change_res.json()["session"]["incorrect_count"] == 0
+
+    # Paper reflects new selection
+    paper2 = (await client.get(f"{BASE}/practice/sessions/{sid}/paper")).json()
+    assert paper2["questions"][0]["selected_answer_id"] == right_id

@@ -75,6 +75,19 @@ export interface CurrentQuestion {
   question: PracticeQuestion | null
 }
 
+export interface ExamPaperQuestion {
+  id: number
+  text: string
+  topic: string
+  answers: { id: number; text: string }[]
+  selected_answer_id: number | null
+}
+
+export interface ExamPaperResponse {
+  session: SessionProgress
+  questions: ExamPaperQuestion[]
+}
+
 export interface AnswerFeedback {
   is_correct: boolean
   correct_answer_id: number | null
@@ -302,6 +315,8 @@ export const api = {
     body: { question_id: number; time_spent_seconds: number },
   ) => post<{ session: SessionProgress }>(`/practice/sessions/${id}/skip`, body),
   results: (id: number) => request<PracticeResults>(`/practice/sessions/${id}/results`),
+  completeSession: (id: number) => post<SessionProgress>(`/practice/sessions/${id}/complete`, {}),
+  examPaper: (id: number) => request<ExamPaperResponse>(`/practice/sessions/${id}/paper`),
 
   topics: () => request<TopicOption[]>('/topics'),
 

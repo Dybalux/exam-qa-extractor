@@ -26,6 +26,8 @@ from app.schemas.ui import (
     AnswerFeedback,
     CurrentQuestionResponse,
     DashboardResponse,
+    ExamPaperQuestion,
+    ExamPaperResponse,
     PracticeAnswerOption,
     PracticeOptionsResponse,
     PracticeQuestion,
@@ -189,12 +191,28 @@ async def ui_practice_answer(
     correct = next(
         (a for a in answers if a.answer_type == AnswerType.CORRECT.value), None
     )
+    selected = next((a for a in answers if a.id == payload.selected_answer_id), None)
+
+    explanation: str | None = None
+    if not record.is_correct and selected and selected.explanation:
+        selected_expl = selected.explanation.strip()
+        if correct and correct.explanation:
+            correct_expl = correct.explanation.strip()
+            if selected_expl == correct_expl:
+                explanation = selected_expl
+            else:
+                explanation = f"{selected_expl}\n\n{correct_expl}"
+        else:
+            explanation = selected_expl
+    elif correct and correct.explanation:
+        explanation = correct.explanation.strip()
+
     session = await service.get_session(session_id)
     return AnswerFeedback(
         is_correct=bool(record.is_correct),
         correct_answer_id=correct.id if correct else None,
         correct_answer_text=correct.answer_text if correct else None,
-        explanation=correct.explanation if correct else None,
+        explanation=explanation,
         session=_progress(session),
     )
 
@@ -231,3 +249,48 @@ async def ui_practice_results(
     """Per-question breakdown for a session."""
     results = await service.get_session_results(session_id)
     return PracticeResultsResponse.model_validate(results)
+
+
+@router.post(
+    "/practice/sessions/{session_id}/complete",
+    response_model=SessionProgress,
+    tags=["ui"],
+)
+async def ui_practice_complete(
+    session_id: int,
+    service: PracticeService = Depends(get_practice_service),
+) -> SessionProgress:
+    """Complete a practice session explicitly (e.g. on exam simulation timeout)."""
+    session = await service.get_session(session_id)
+    if not session.is_completed:
+        session = await service.complete_session(session_id)
+    return _progress(session)
+
+
+@router.get(
+    "/practice/sessions/{session_id}/paper",
+    response_model=ExamPaperResponse,
+    tags=["ui"],
+)
+async def ui_practice_exam_paper(
+    session_id: int,
+    service: PracticeService = Depends(get_practice_service),
+) -> ExamPaperResponse:
+    """Fetch all questions and user selections for an exam simulation."""
+    data = await service.get_exam_paper(session_id)
+    return ExamPaperResponse(
+        session=_progress(data["session"]),
+        questions=[
+            ExamPaperQuestion(
+                id=q["id"],
+                text=q["text"],
+                topic=q["topic"],
+                answers=[
+                    PracticeAnswerOption(id=a["id"], text=a["text"])
+                    for a in q["answers"]
+                ],
+                selected_answer_id=q["selected_answer_id"],
+            )
+            for q in data["questions"]
+        ],
+    )

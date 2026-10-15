@@ -50,7 +50,16 @@ export default function PracticeStart() {
         <legend style={{ marginBottom: 'var(--s-2)' }}>Modo de práctica</legend>
         {modes.map((m) => (
           <label key={m} className="mode">
-            <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
+            <input
+              type="radio"
+              name="mode"
+              value={m}
+              checked={mode === m}
+              onChange={() => {
+                setMode(m)
+                if (m === 'exam_simulation') setTotal(10)
+              }}
+            />
             <strong>{MODE_INFO[m]?.label ?? m}</strong>
             <span>{MODE_INFO[m]?.hint}</span>
           </label>
@@ -58,6 +67,11 @@ export default function PracticeStart() {
       </fieldset>
 
       <Card title="Filtros">
+        {mode === 'exam_simulation' && (
+          <div style={{ marginBottom: 'var(--s-4)', padding: 'var(--s-3)', background: 'var(--surface-sunk)', borderRadius: 'var(--r-sm)', fontSize: '0.9rem' }}>
+            ⏱️ <strong>Condiciones de examen real:</strong> 10 minutos de cuenta regresiva con auto-entrega. Corrección a ciegas (los resultados y explicaciones se muestran al finalizar).
+          </div>
+        )}
         <div className="row" style={{ alignItems: 'flex-end' }}>
           <div className="field">
             <label htmlFor="exam">Examen (opcional)</label>

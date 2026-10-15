@@ -99,6 +99,19 @@ class CurrentQuestionResponse(BaseModel):
     question: PracticeQuestion | None
 
 
+class ExamPaperQuestion(BaseModel):
+    id: int
+    text: str
+    topic: str
+    answers: list[PracticeAnswerOption]
+    selected_answer_id: int | None = None
+
+
+class ExamPaperResponse(BaseModel):
+    session: SessionProgress
+    questions: list[ExamPaperQuestion]
+
+
 class SubmitAnswerRequest(BaseModel):
     question_id: int
     selected_answer_id: int

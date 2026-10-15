@@ -98,11 +98,16 @@ class PracticeService:
 
         actual_total = min(total_questions, len(available))
 
+        session_filters = dict(filters) if filters else {}
+        if mode == PracticeMode.EXAM_SIMULATION.value:
+            selected_sample = random.sample(available, actual_total)
+            session_filters["question_ids"] = [q.id for q in selected_sample]
+
         practice_session = PracticeSession(
             user_session_id=user_session_id,
             mode=mode,
             exam_id=exam_id,
-            filters=filters,
+            filters=session_filters,
             total_questions=actual_total,
             started_at=datetime.now(timezone.utc),
         )
@@ -269,7 +274,49 @@ class PracticeService:
                 PracticeResponse.question_id == question_id,
             )
         )
-        if existing.scalar_one_or_none():
+        existing_response = existing.scalar_one_or_none()
+        if existing_response:
+            if practice_session.mode == PracticeMode.EXAM_SIMULATION.value:
+                # In exam simulation, user can navigate back and change/set their answer
+                answer_result = await self.session.execute(
+                    select(Answer).where(Answer.id == selected_answer_id)
+                )
+                answer = answer_result.scalar_one_or_none()
+                if not answer:
+                    raise NotFoundError(f"Answer not found: {selected_answer_id}")
+                if answer.question_id != question_id:
+                    raise ValidationError(
+                        f"Answer {selected_answer_id} does not belong to question {question_id}"
+                    )
+                is_correct = answer.answer_type == AnswerType.CORRECT.value
+
+                if existing_response.selected_answer_id is None:
+                    practice_session.skipped_count = max(
+                        0, practice_session.skipped_count - 1
+                    )
+                elif existing_response.is_correct:
+                    practice_session.correct_count = max(
+                        0, practice_session.correct_count - 1
+                    )
+                else:
+                    practice_session.incorrect_count = max(
+                        0, practice_session.incorrect_count - 1
+                    )
+
+                existing_response.selected_answer_id = selected_answer_id
+                existing_response.is_correct = is_correct
+                existing_response.time_spent_seconds += max(0, time_spent_seconds)
+                existing_response.was_flagged = was_flagged
+                existing_response.answered_at = datetime.now(timezone.utc)
+
+                if is_correct:
+                    practice_session.correct_count += 1
+                else:
+                    practice_session.incorrect_count += 1
+
+                await self.session.commit()
+                await self.session.refresh(existing_response)
+                return existing_response
             raise ValidationError(
                 f"Question {question_id} already answered in session {session_id}"
             )
@@ -348,7 +395,10 @@ class PracticeService:
                 PracticeResponse.question_id == question_id,
             )
         )
-        if existing.scalar_one_or_none():
+        existing_resp = existing.scalar_one_or_none()
+        if existing_resp:
+            if practice_session.mode == PracticeMode.EXAM_SIMULATION.value:
+                return existing_resp
             raise ValidationError(
                 f"Question {question_id} already answered in session {session_id}"
             )
@@ -371,6 +421,56 @@ class PracticeService:
 
         logger.info(f"Session {session_id}: skipped question {question_id}")
         return response
+
+    async def get_exam_paper(self, session_id: int) -> dict:
+        """Fetch all questions for an exam simulation session with user responses."""
+        session = await self.get_session(session_id)
+
+        question_ids = (session.filters or {}).get("question_ids")
+        if not question_ids:
+            available = await self._get_available_questions(
+                exam_id=session.exam_id,
+                filters=session.filters or {},
+            )
+            question_ids = [q.id for q in available[: session.total_questions]]
+            if not session.filters:
+                session.filters = {}
+            session.filters["question_ids"] = question_ids
+            await self.session.commit()
+
+        q_res = await self.session.execute(
+            select(Question)
+            .options(selectinload(Question.answers))
+            .where(Question.id.in_(question_ids))
+        )
+        q_map = {q.id: q for q in q_res.scalars().all()}
+        ordered_questions = [q_map[qid] for qid in question_ids if qid in q_map]
+
+        resp_res = await self.session.execute(
+            select(PracticeResponse).where(PracticeResponse.session_id == session_id)
+        )
+        resp_map = {r.question_id: r for r in resp_res.scalars().all()}
+
+        questions_data = []
+        for q in ordered_questions:
+            resp = resp_map.get(q.id)
+            answers = list(q.answers)
+            r_inst = random.Random(f"{session_id}_{q.id}")
+            r_inst.shuffle(answers)
+            questions_data.append(
+                {
+                    "id": q.id,
+                    "text": q.question_text,
+                    "topic": q.topic,
+                    "answers": [{"id": a.id, "text": a.answer_text} for a in answers],
+                    "selected_answer_id": resp.selected_answer_id if resp else None,
+                }
+            )
+
+        return {
+            "session": session,
+            "questions": questions_data,
+        }
 
     # ------------------------------------------------------------------
     # Results
