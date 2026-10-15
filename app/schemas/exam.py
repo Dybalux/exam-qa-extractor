@@ -16,19 +16,6 @@ class ExamCreate(BaseModel):
     )
 
 
-class ExamUpdate(BaseModel):
-    """Payload to update exam metadata."""
-
-    exam_date: date | None = None
-    topic_tags: str | None = None
-
-
-class TagsUpdate(BaseModel):
-    """Payload to add or remove topic tags."""
-
-    tags: list[str] = Field(..., min_length=1)
-
-
 class ExamResponse(BaseModel):
     """Full exam representation."""
 
@@ -41,16 +28,3 @@ class ExamResponse(BaseModel):
     topic_tags: str | None
     created_at: datetime
     updated_at: datetime
-
-
-class ExamStats(BaseModel):
-    """Exam statistics summary."""
-
-    exam_id: int
-    partial_number: int
-    exam_date: date | None
-    topic_tags: str | None
-    total_questions: int
-    questions_by_topic: dict[str, int]
-    ready_for_practice: int
-    needs_answers: int

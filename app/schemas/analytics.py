@@ -15,15 +15,6 @@ class OverallStats(BaseModel):
     completed_practice_sessions: int
 
 
-class TopicPerformanceItem(BaseModel):
-    """Accuracy stats for a single topic."""
-
-    topic: str
-    correct: int
-    total: int
-    accuracy_pct: float
-
-
 class WeakArea(BaseModel):
     """Topic where the user performs below threshold."""
 
@@ -62,13 +53,6 @@ class TopicProgress(BaseModel):
     total: int
     ready: int
     readiness_pct: float
-
-
-class StudyProgress(BaseModel):
-    """Content readiness broken down by partial and topic."""
-
-    by_partial: dict[str, PartialProgress]
-    by_topic: dict[str, TopicProgress]
 
 
 class TopicCoverage(BaseModel):

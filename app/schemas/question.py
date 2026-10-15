@@ -2,55 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class QuestionCreate(BaseModel):
-    """Payload to create a question manually."""
-
-    exam_id: int
-    question_text: str = Field(..., min_length=1)
-    topic: str = Field(default="other")
-    order_in_exam: int | None = Field(None, ge=1, le=50)
-    image_id: int | None = None
-    extracted_text: str | None = None
-    confidence_score: float | None = Field(None, ge=0.0, le=100.0)
-
-
-class QuestionUpdate(BaseModel):
-    """Payload to update a question."""
-
-    question_text: str | None = Field(None, min_length=1)
-    topic: str | None = None
-    order_in_exam: int | None = Field(None, ge=1, le=50)
-    correction_notes: str | None = None
-    is_corrected: bool | None = None
-    has_code_in_answers: bool | None = None
-
-
-class OCRCorrection(BaseModel):
-    """Payload to submit a manual OCR correction."""
-
-    corrected_text: str = Field(..., min_length=1)
-    notes: str | None = None
-
-
-class BulkQuestionItem(BaseModel):
-    """Single question entry for bulk OCR import."""
-
-    question_text: str = Field(..., min_length=1)
-    extracted_text: str | None = None
-    confidence_score: float | None = Field(None, ge=0.0, le=100.0)
-    topic: str = "other"
-    order_in_exam: int | None = None
-
-
-class BulkCreateRequest(BaseModel):
-    """Payload for bulk question creation from OCR results."""
-
-    exam_id: int
-    image_id: int | None = None
-    questions: list[BulkQuestionItem] = Field(..., min_length=1)
+from pydantic import BaseModel, ConfigDict
 
 
 class QuestionResponse(BaseModel):
@@ -73,10 +25,3 @@ class QuestionResponse(BaseModel):
     is_ready_for_practice: bool
     created_at: datetime
     updated_at: datetime
-
-
-class BulkCreateResponse(BaseModel):
-    """Response for bulk question creation."""
-
-    created: int
-    questions: list[QuestionResponse]
