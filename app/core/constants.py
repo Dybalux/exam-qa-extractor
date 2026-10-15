@@ -69,3 +69,15 @@ MAX_FILE_SIZE_MB = 10
 CONFIDENCE_HIGH = 80.0
 CONFIDENCE_MEDIUM = 60.0
 CONFIDENCE_LOW = 40.0
+
+# Topic distribution blueprints for exam simulations by partial number.
+# Maps partial_number -> {topic_slug: target_percentage}
+EXAM_SIMULATION_BLUEPRINTS: dict[int, dict[str, float]] = {
+    3: {
+        "processes": 0.10,  # Cap. 4: Hilos / Multithreading / Procesos (10%)
+        "scheduling": 0.30,  # Cap. 5: Planificación de CPU (30%)
+        "synchronization": 0.30,  # Cap. 6: Sincronización de Procesos (30%)
+        "deadlock": 0.20,  # Cap. 7: Deadlocks / Abrazo Mortal (20%)
+        "memory": 0.10,  # Cap. 8: Gestión de Memoria Principal (10%)
+    }
+}

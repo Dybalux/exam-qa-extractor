@@ -126,12 +126,12 @@ Error review mode MUST integrate with the existing practice session lifecycle wi
 - WHEN a user starts a session in `random`, `by_partial`, `by_topic`, or `exam_simulation` mode
 - THEN the question selection and session behavior MUST be unchanged from prior behavior
 
-### Future Improvement: REQ-PM-7 (Structured Exam Simulation Question Distribution)
+### Requirement: REQ-PM-7 (Structured Exam Simulation Question Distribution)
 
-When mode is `exam_simulation`, the system SHOULD support a structured topic distribution blueprint to evaluate exams proportionally chapter-by-chapter rather than purely uniform random sampling.
+When mode is `exam_simulation`, the system MUST support a structured topic distribution blueprint to evaluate exams proportionally chapter-by-chapter rather than purely uniform random sampling.
 
 For a standard 10-question simulation of Parcial 3 (Sistemas Operativos):
-- **Capítulo 4 (Hilos / Multithreading)**: 1 question (10%)
+- **Capítulo 4 (Hilos / Multithreading / Procesos)**: 1 question (10%)
 - **Capítulo 5 (Planificación de CPU)**: 3 questions (30%)
 - **Capítulo 6 (Sincronización de Procesos)**: 3 questions (30%)
 - **Capítulo 7 (Deadlocks / Abrazo Mortal)**: 2 questions (20%)

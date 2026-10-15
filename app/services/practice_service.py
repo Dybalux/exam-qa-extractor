@@ -2,18 +2,25 @@
 
 import logging
 import random
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.constants import AnswerType, PracticeMode
+from app.core.constants import (
+    EXAM_SIMULATION_BLUEPRINTS,
+    AnswerType,
+    PracticeMode,
+)
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models.answer import Answer
+from app.models.exam import Exam
 from app.models.practice_response import PracticeResponse
 from app.models.practice_session import PracticeSession
 from app.models.question import Question
+from app.models.topic import Topic
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +107,27 @@ class PracticeService:
 
         session_filters = dict(filters) if filters else {}
         if mode == PracticeMode.EXAM_SIMULATION.value:
-            selected_sample = random.sample(available, actual_total)
+            blueprint = None
+            if exam_id is not None:
+                exam_stmt = select(Exam.partial_number).where(Exam.id == exam_id)
+                exam_part = (await self.session.execute(exam_stmt)).scalar_one_or_none()
+                if exam_part in EXAM_SIMULATION_BLUEPRINTS:
+                    blueprint = EXAM_SIMULATION_BLUEPRINTS[exam_part]
+
+            if blueprint is None:
+                available_topics = {q.topic for q in available}
+                if set(EXAM_SIMULATION_BLUEPRINTS[3].keys()).issubset(available_topics):
+                    blueprint = EXAM_SIMULATION_BLUEPRINTS[3]
+
+            if blueprint:
+                selected_sample = self._select_structured_exam_questions(
+                    available=available,
+                    total=actual_total,
+                    blueprint=blueprint,
+                )
+            else:
+                selected_sample = random.sample(available, actual_total)
+
             session_filters["question_ids"] = [q.id for q in selected_sample]
 
         practice_session = PracticeSession(
@@ -214,12 +241,15 @@ class PracticeService:
         )
         answered_ids = set(answered_result.scalars().all())
 
-        # For error_review mode, recompute failed question IDs
+        # For error_review mode, recompute failed question IDs.
+        # For exam_simulation, restrict to the preselected blueprint question IDs.
         question_ids = None
         if practice_session.mode == PracticeMode.ERROR_REVIEW.value:
             question_ids = await self._get_failed_question_ids(
                 practice_session.user_session_id
             )
+        elif practice_session.mode == PracticeMode.EXAM_SIMULATION.value:
+            question_ids = (practice_session.filters or {}).get("question_ids")
 
         available = await self._get_available_questions(
             exam_id=practice_session.exam_id,
@@ -563,13 +593,15 @@ class PracticeService:
         Returns:
             List of ready-for-practice questions
         """
-        query = select(Question)
+        query = select(Question).options(selectinload(Question.topic_relation))
 
         if exam_id is not None:
             query = query.where(Question.exam_id == exam_id)
 
         if topic := filters.get("topic"):
-            query = query.where(Question.topic == topic)
+            query = query.join(Topic, Question.topic_id == Topic.id).where(
+                Topic.slug == topic
+            )
 
         if question_ids is not None:
             query = query.where(Question.id.in_(question_ids))
@@ -579,6 +611,90 @@ class PracticeService:
 
         # is_ready_for_practice requires loaded answers (selectin on model)
         return [q for q in all_questions if q.is_ready_for_practice]
+
+    def _select_structured_exam_questions(
+        self,
+        available: list[Question],
+        total: int,
+        blueprint: dict[str, float],
+    ) -> list[Question]:
+        """Select questions according to a topic distribution blueprint with fallback.
+
+        Args:
+            available: Pool of questions ready for practice
+            total: Desired total number of questions
+            blueprint: Dict mapping topic slug -> target percentage (e.g. 0.30)
+
+        Returns:
+            List of selected Question instances
+        """
+        if not available:
+            return []
+
+        actual_total = min(total, len(available))
+        if actual_total <= 0:
+            return []
+
+        # Group available questions by topic slug
+        pool_by_topic: dict[str, list[Question]] = defaultdict(list)
+        for q in available:
+            pool_by_topic[q.topic].append(q)
+
+        # Calculate integer quota per topic
+        quotas: dict[str, int] = {}
+        allocated = 0
+        for topic, weight in blueprint.items():
+            quota = round(actual_total * weight)
+            quotas[topic] = quota
+            allocated += quota
+
+        # Reconcile rounding discrepancies
+        if allocated != actual_total and quotas:
+            diff = actual_total - allocated
+            sorted_topics = sorted(
+                blueprint.keys(), key=lambda t: blueprint[t], reverse=True
+            )
+            for t in sorted_topics:
+                if diff == 0:
+                    break
+                if diff > 0:
+                    quotas[t] += 1
+                    diff -= 1
+                elif diff < 0 and quotas[t] > 0:
+                    quotas[t] -= 1
+                    diff += 1
+
+        selected: list[Question] = []
+        selected_ids: set[int] = set()
+
+        # Step 1: Draw up to quota for each topic in blueprint
+        for topic, quota in quotas.items():
+            topic_pool = [
+                q for q in pool_by_topic.get(topic, []) if q.id not in selected_ids
+            ]
+            take_count = min(quota, len(topic_pool))
+            if take_count > 0:
+                sampled = random.sample(topic_pool, take_count)
+                selected.extend(sampled)
+                selected_ids.update(q.id for q in sampled)
+
+        # Step 2: Fallback if any topic lacked sufficient questions
+        if len(selected) < actual_total:
+            remaining_pool = [q for q in available if q.id not in selected_ids]
+            needed = actual_total - len(selected)
+            if remaining_pool and needed > 0:
+                fallback_sample = random.sample(
+                    remaining_pool, min(needed, len(remaining_pool))
+                )
+                selected.extend(fallback_sample)
+                selected_ids.update(q.id for q in fallback_sample)
+
+        # Step 3: Ensure exact target size
+        selected = selected[:actual_total]
+
+        # Step 4: Randomize question order across chapters
+        random.shuffle(selected)
+        return selected
 
     async def _get_failed_question_ids(self, user_session_id: str) -> list[int]:
         """Return deduplicated IDs of questions this user has ever answered
