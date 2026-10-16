@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type QuestionFilters } from '../api.ts'
 import { useDeleteQuestion } from '../actions.ts'
@@ -14,6 +14,7 @@ export default function QuestionList() {
   const { data, error, isPending } = useQuery({
     queryKey: ['questions', filters],
     queryFn: () => api.questions(filters),
+    placeholderData: keepPreviousData,
   })
   const remove = useDeleteQuestion()
 
@@ -124,25 +125,27 @@ export default function QuestionList() {
                   <th>Examen</th>
                   <th>Tema</th>
                   <th>Estado</th>
-                  <th>Acciones</th>
+                  <th className="col-actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {data.questions.map((q) => (
                   <tr key={q.id}>
-                    <td className="cell-text">
-                      <Link to={`/questions/${q.id}`}>{q.question_text}</Link>
+                    <td className="cell-text" data-label="Pregunta">
+                      <Link to={`/questions/${q.id}`}>
+                        {q.question_text.length > 120 ? `${q.question_text.slice(0, 120)}…` : q.question_text}
+                      </Link>
                       {q.confidence_score != null && (
                         <div className="hint">OCR: {Math.round(q.confidence_score)}%</div>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Examen">
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>
                     </td>
-                    <td>
+                    <td data-label="Tema">
                       <span className="pill">{q.topic}</span>
                     </td>
-                    <td>
+                    <td data-label="Estado">
                       <div className="tags">
                         <span className={`pill ${q.is_ready_for_practice ? 'pill-right' : ''}`}>
                           {q.is_ready_for_practice ? '✓ Lista' : 'Sin respuesta'}
@@ -150,10 +153,16 @@ export default function QuestionList() {
                         {q.is_corrected && <span className="pill">Corregida</span>}
                       </div>
                     </td>
-                    <td>
+                    <td className="col-actions">
                       <div className="table-actions">
-                        <Link to={`/questions/${q.id}`}>Ver</Link>
-                        {!q.is_corrected && <Link to={`/questions/${q.id}/correct`}>Corregir</Link>}
+                        <ButtonLink to={`/questions/${q.id}`} variant="quiet" small>
+                          Ver
+                        </ButtonLink>
+                        {!q.is_corrected && (
+                          <ButtonLink to={`/questions/${q.id}/correct`} variant="quiet" small>
+                            Corregir
+                          </ButtonLink>
+                        )}
                         <Button
                           variant="danger"
                           small

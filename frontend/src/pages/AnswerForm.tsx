@@ -73,9 +73,9 @@ function AnswerFormFields({ questionId, answer }: { questionId: number; answer?:
           />
           <p className="hint">Se muestra después de responder en modo práctica.</p>
         </div>
-        <label className="row" style={{ gap: 'var(--s-2)' }}>
+        <label className="check-row">
           <input type="checkbox" checked={misconception} onChange={(e) => setMisconception(e.target.checked)} />
-          Error común (confunde a muchos estudiantes)
+          <span>Error común (confunde a muchos estudiantes)</span>
         </label>
         {save.error && <ErrorNotice error={save.error} />}
         <div className="row">

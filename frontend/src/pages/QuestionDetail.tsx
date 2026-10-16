@@ -105,7 +105,9 @@ export default function QuestionDetail() {
                   </div>
                   {a.explanation && <p className="why">{a.explanation}</p>}
                   <div className="table-actions" style={{ marginTop: 'var(--s-2)' }}>
-                    <Link to={`/questions/${question.id}/answers/${a.id}/edit`}>Editar</Link>
+                    <ButtonLink to={`/questions/${question.id}/answers/${a.id}/edit`} variant="quiet" small>
+                      Editar
+                    </ButtonLink>
                     <Button
                       variant="danger"
                       small

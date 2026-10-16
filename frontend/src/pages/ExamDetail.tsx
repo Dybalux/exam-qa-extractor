@@ -99,22 +99,24 @@ export default function ExamDetail() {
                   <th>Pregunta</th>
                   <th>Tema</th>
                   <th>Estado</th>
-                  <th></th>
+                  <th className="col-actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {questions.map((q) => (
                   <tr key={q.id}>
-                    <td className="num">{q.order_in_exam ?? '—'}</td>
-                    <td className="cell-text">
+                    <td className="num" data-label="#">
+                      {q.order_in_exam ?? '—'}
+                    </td>
+                    <td className="cell-text" data-label="Pregunta">
                       <Link to={`/questions/${q.id}`}>
                         {q.question_text.length > 80 ? `${q.question_text.slice(0, 80)}…` : q.question_text}
                       </Link>
                     </td>
-                    <td>
+                    <td data-label="Tema">
                       <span className="pill">{q.topic}</span>
                     </td>
-                    <td>
+                    <td data-label="Estado">
                       <div className="tags">
                         <span className={`pill ${q.is_ready_for_practice ? 'pill-right' : ''}`}>
                           {q.is_ready_for_practice ? '✓ Lista' : 'Sin respuesta'}
@@ -124,10 +126,16 @@ export default function ExamDetail() {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td className="col-actions">
                       <div className="table-actions">
-                        <Link to={`/questions/${q.id}`}>Ver</Link>
-                        {!q.is_corrected && <Link to={`/questions/${q.id}/correct`}>Corregir</Link>}
+                        <ButtonLink to={`/questions/${q.id}`} variant="quiet" small>
+                          Ver
+                        </ButtonLink>
+                        {!q.is_corrected && (
+                          <ButtonLink to={`/questions/${q.id}/correct`} variant="quiet" small>
+                            Corregir
+                          </ButtonLink>
+                        )}
                       </div>
                     </td>
                   </tr>

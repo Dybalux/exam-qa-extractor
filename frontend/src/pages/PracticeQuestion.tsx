@@ -27,7 +27,7 @@ function Ticks({ session, outcomes }: { session: SessionProgress; outcomes: Outc
       aria-valuenow={session.questions_answered}
     >
       {Array.from({ length: session.total_questions }, (_, i) => {
-        const done = i < session.questions_answered + session.skipped_count
+        const done = i < session.questions_answered
         const cls = outcomes[i] ? `tick-${outcomes[i]}` : done ? 'tick-skip' : i === outcomes.length ? 'tick-now' : ''
         return <span key={i} className={`tick ${cls}`} />
       })}
@@ -48,10 +48,13 @@ function QuestionCard({
   onSkipped: () => void
   onNext: () => void
 }) {
-  const startedAt = useRef(Date.now())
+  const startedAt = useRef(0)
   const [picked, setPicked] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null)
-  const elapsed = () => Math.round((Date.now() - startedAt.current) / 1000)
+  useEffect(() => {
+    startedAt.current = Date.now()
+  }, [])
+  const elapsed = () => Math.max(0, Math.round((Date.now() - startedAt.current) / 1000))
 
   const submit = useMutation({
     mutationFn: (answerId: number) =>
@@ -145,8 +148,7 @@ function QuestionCard({
       <div className="actions">
         {feedback ? (
           <Button onClick={onNext} large>
-            {feedback.session.questions_answered + feedback.session.skipped_count >=
-            feedback.session.total_questions
+            {feedback.session.questions_answered >= feedback.session.total_questions
               ? 'Ver resultados'
               : 'Siguiente pregunta'}
           </Button>
@@ -179,7 +181,73 @@ function ExamSimulationPaper({
   })
   const [showConfirm, setShowConfirm] = useState(false)
   const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS)
-  const startedAt = useRef(Date.now())
+  const [showWarningModal, setShowWarningModal] = useState(false)
+  const startedAt = useRef(0)
+  const lastViolationAt = useRef(0)
+  const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    startedAt.current = Date.now()
+  }, [])
+
+  // Anti-cheat: monitor tab visibility, window focus, and prevent copy/cut
+  useEffect(() => {
+    const handleViolation = () => {
+      if (isSubmittingRef.current) return
+      const now = Date.now()
+      // 1.5s cooldown to debounce blur and visibilitychange firing together
+      if (now - lastViolationAt.current < 1500) return
+      lastViolationAt.current = now
+
+      const strikesKey = `exam_sim_strikes_${sessionId}`
+      const currentStrikes = Number(sessionStorage.getItem(strikesKey) || '0') + 1
+      sessionStorage.setItem(strikesKey, String(currentStrikes))
+
+      if (currentStrikes === 1) {
+        // First violation: display warning modal
+        setShowWarningModal(true)
+      } else if (currentStrikes >= 2) {
+        // Second violation: auto-submit and lockout
+        isSubmittingRef.current = true
+        setShowWarningModal(false)
+        sessionStorage.removeItem(`exam_sim_start_${sessionId}`)
+        sessionStorage.removeItem(strikesKey)
+        api.completeSession(sessionId, { lockout_reason: 'focus_lost' }).finally(() => {
+          onComplete()
+        })
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleViolation()
+      }
+    }
+
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches
+    const onBlur = () => {
+      // On mobile touch devices, rely on visibilitychange so OS banners don't falsely penalize
+      if (!isTouchDevice) {
+        handleViolation()
+      }
+    }
+
+    const onPrevent = (e: Event) => {
+      e.preventDefault()
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('copy', onPrevent)
+    document.addEventListener('cut', onPrevent)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('copy', onPrevent)
+      document.removeEventListener('cut', onPrevent)
+    }
+  }, [sessionId, onComplete])
 
   // Countdown timer
   useEffect(() => {
@@ -196,7 +264,10 @@ function ExamSimulationPaper({
       setTimeLeft(remaining)
 
       if (remaining <= 0) {
+        if (isSubmittingRef.current) return
+        isSubmittingRef.current = true
         sessionStorage.removeItem(storageKey)
+        sessionStorage.removeItem(`exam_sim_strikes_${sessionId}`)
         api.completeSession(sessionId).finally(() => {
           onComplete()
         })
@@ -215,7 +286,7 @@ function ExamSimulationPaper({
       api.submitAnswer(sessionId, {
         question_id: qId,
         selected_answer_id: aId,
-        time_spent_seconds: Math.round((Date.now() - startedAt.current) / 1000),
+        time_spent_seconds: Math.max(0, Math.round((Date.now() - startedAt.current) / 1000)),
       }),
   })
 
@@ -259,7 +330,10 @@ function ExamSimulationPaper({
   }
 
   const executeFinish = () => {
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
     sessionStorage.removeItem(`exam_sim_start_${sessionId}`)
+    sessionStorage.removeItem(`exam_sim_strikes_${sessionId}`)
     api.completeSession(sessionId).finally(() => {
       onComplete()
     })
@@ -321,7 +395,7 @@ function ExamSimulationPaper({
       {showConfirm && (
         <div
           style={{
-            marginBottom: 'var(--s-6)',
+            marginBottom: 'var(--s-5)',
             padding: 'var(--s-4)',
             background: 'var(--surface)',
             border: '2px solid var(--accent)',
@@ -338,6 +412,34 @@ function ExamSimulationPaper({
             </Button>
             <Button variant="quiet" onClick={() => setShowConfirm(false)}>
               Seguir respondiendo
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Anti-cheat Strike 1 Warning Dialog */}
+      {showWarningModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-3)', marginBottom: 'var(--s-3)' }}>
+              <span style={{ fontSize: '2rem' }}>⚠️</span>
+              <h3 style={{ margin: 0, color: 'var(--wrong)' }}>Advertencia de Seguridad</h3>
+            </div>
+            <p style={{ margin: '0 0 var(--s-3)', lineHeight: 1.5 }}>
+              Detectamos que saliste de la ventana del examen o cambiaste de aplicación.
+            </p>
+            <p className="muted" style={{ margin: '0 0 var(--s-5)', fontSize: '0.9rem' }}>
+              <strong>Esta es tu única advertencia.</strong> Si volvés a perder el foco de pantalla o cambiar de pestaña, el examen se entregará y bloqueará de manera automática y definitiva.
+            </p>
+            <Button
+              onClick={() => {
+                setShowWarningModal(false)
+                lastViolationAt.current = Date.now()
+                window.focus()
+              }}
+              style={{ width: '100%' }}
+            >
+              Entendido, continuar examen
             </Button>
           </div>
         </div>
@@ -383,7 +485,7 @@ function ExamSimulationPaper({
             ← Anterior
           </Button>
 
-          <span className="muted" style={{ fontSize: '0.85rem' }}>
+          <span className="muted exam-footer-status">
             {answers[currentQ.id] != null ? '✓ Guardada' : 'Sin responder'}
           </span>
 
@@ -409,25 +511,35 @@ export default function PracticeQuestion() {
   const queryClient = useQueryClient()
   const [outcomes, setOutcomes] = useState<Outcome[]>([])
 
-  // Query for exam simulation full paper
-  const paperQuery = useQuery({
-    queryKey: ['practice-paper', sessionId],
-    queryFn: () => api.examPaper(sessionId),
+  // Fetch session metadata first to determine mode safely without mutations or racing
+  const sessionQuery = useQuery({
+    queryKey: ['practice-session', sessionId],
+    queryFn: () => api.session(sessionId),
     staleTime: Infinity,
     gcTime: 0,
     enabled: Number.isFinite(sessionId),
   })
 
-  // Regular practice query
+  const mode = sessionQuery.data?.mode
+  const isExamSimulation = mode === 'exam_simulation'
+
+  // Query for exam simulation full paper - ONLY enabled if mode is exam_simulation
+  const paperQuery = useQuery({
+    queryKey: ['practice-paper', sessionId],
+    queryFn: () => api.examPaper(sessionId),
+    staleTime: Infinity,
+    gcTime: 0,
+    enabled: Number.isFinite(sessionId) && isExamSimulation,
+  })
+
+  // Regular practice query - ONLY enabled if mode is known and NOT exam_simulation
   const current = useQuery({
     queryKey: ['practice-current', sessionId],
     queryFn: () => api.currentQuestion(sessionId),
     staleTime: Infinity,
     gcTime: 0,
-    enabled: Number.isFinite(sessionId) && paperQuery.data?.session.mode !== 'exam_simulation',
+    enabled: Number.isFinite(sessionId) && mode !== undefined && !isExamSimulation,
   })
-
-  const isExamSimulation = paperQuery.data?.session.mode === 'exam_simulation'
 
   const onExamComplete = () => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -444,11 +556,11 @@ export default function PracticeQuestion() {
 
   if (!Number.isFinite(sessionId)) return <Navigate to="/practice" replace />
 
-  if (paperQuery.isPending) return <Loading />
-  if (paperQuery.error) {
+  if (sessionQuery.isPending) return <Loading />
+  if (sessionQuery.error) {
     return (
       <div className="stack">
-        <ErrorNotice error={paperQuery.error} />
+        <ErrorNotice error={sessionQuery.error} />
         <div className="row">
           <Button variant="quiet" onClick={() => navigate('/practice')}>
             Volver a práctica
@@ -459,17 +571,33 @@ export default function PracticeQuestion() {
   }
 
   // If in Exam Simulation mode: render full navigable exam paper!
-  if (isExamSimulation && paperQuery.data) {
-    if (paperQuery.data.session.is_completed) {
-      return <Navigate to={`/practice/${sessionId}/results`} replace />
+  if (isExamSimulation) {
+    if (paperQuery.isPending) return <Loading />
+    if (paperQuery.error) {
+      return (
+        <div className="stack">
+          <ErrorNotice error={paperQuery.error} />
+          <div className="row">
+            <Button variant="quiet" onClick={() => navigate('/practice')}>
+              Volver a práctica
+            </Button>
+          </div>
+        </div>
+      )
     }
-    return (
-      <ExamSimulationPaper
-        sessionId={sessionId}
-        paper={paperQuery.data}
-        onComplete={onExamComplete}
-      />
-    )
+    if (paperQuery.data) {
+      if (paperQuery.data.session.is_completed) {
+        return <Navigate to={`/practice/${sessionId}/results`} replace />
+      }
+      return (
+        <ExamSimulationPaper
+          sessionId={sessionId}
+          paper={paperQuery.data}
+          onComplete={onExamComplete}
+        />
+      )
+    }
+    return <Loading />
   }
 
   // Classic Flashcard Practice flow for other modes

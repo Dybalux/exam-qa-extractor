@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api.ts'
 import { useDeleteExam } from '../actions.ts'
@@ -11,6 +11,7 @@ export default function ExamList() {
   const { data, error, isPending } = useQuery({
     queryKey: ['exams', partial],
     queryFn: () => api.exams(partial),
+    placeholderData: keepPreviousData,
   })
   const remove = useDeleteExam()
 
@@ -68,11 +69,13 @@ export default function ExamList() {
               <tbody>
                 {data.map((exam) => (
                   <tr key={exam.id}>
-                    <td className="col-nowrap">
+                    <td className="col-nowrap" data-label="Parcial">
                       <Link to={`/exams/${exam.id}`}>Parcial {exam.partial_number}</Link>
                     </td>
-                    <td className="num col-nowrap">{formatExamDate(exam.exam_date)}</td>
-                    <td>
+                    <td className="num col-nowrap" data-label="Fecha">
+                      {formatExamDate(exam.exam_date)}
+                    </td>
+                    <td data-label="Tags">
                       {splitTags(exam.topic_tags).length === 0 ? (
                         <span className="muted">—</span>
                       ) : (
@@ -85,7 +88,9 @@ export default function ExamList() {
                         </div>
                       )}
                     </td>
-                    <td className="num text-center col-nowrap">{exam.question_count}</td>
+                    <td className="num text-center col-nowrap" data-label="Preguntas">
+                      {exam.question_count}
+                    </td>
                     <td className="col-actions col-nowrap">
                       <div className="table-actions">
                         <ButtonLink to={`/exams/${exam.id}/upload`} variant="quiet" small>

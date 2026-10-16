@@ -53,16 +53,18 @@ export default function ReviewQueue() {
                   <th>Confianza</th>
                   <th>Tema</th>
                   <th>Examen</th>
-                  <th></th>
+                  <th className="col-actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {data.questions.map((q) => (
                   <tr key={q.id}>
-                    <td className="cell-text">
-                      {q.question_text.length > 80 ? `${q.question_text.slice(0, 80)}…` : q.question_text}
+                    <td className="cell-text" data-label="Pregunta">
+                      <Link to={`/questions/${q.id}/correct`}>
+                        {q.question_text.length > 80 ? `${q.question_text.slice(0, 80)}…` : q.question_text}
+                      </Link>
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Confianza">
                       {q.confidence_score != null ? (
                         <span className={`pill ${q.confidence_score < 40 ? 'pill-wrong' : 'pill-warn'}`}>
                           {Math.round(q.confidence_score)}%
@@ -71,16 +73,20 @@ export default function ReviewQueue() {
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Tema">
                       <span className="pill">{q.topic}</span>
                     </td>
-                    <td>
+                    <td data-label="Examen">
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>
                     </td>
-                    <td>
+                    <td className="col-actions">
                       <div className="table-actions">
-                        <Link to={`/questions/${q.id}/correct`}>Corregir</Link>
-                        <Link to={`/questions/${q.id}`}>Ver</Link>
+                        <ButtonLink to={`/questions/${q.id}/correct`} small>
+                          Corregir
+                        </ButtonLink>
+                        <ButtonLink to={`/questions/${q.id}`} variant="quiet" small>
+                          Ver
+                        </ButtonLink>
                       </div>
                     </td>
                   </tr>

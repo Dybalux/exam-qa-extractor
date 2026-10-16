@@ -68,7 +68,7 @@ export default function PracticeStart() {
 
       <Card title="Filtros">
         {mode === 'exam_simulation' && (
-          <div style={{ marginBottom: 'var(--s-4)', padding: 'var(--s-3)', background: 'var(--surface-sunk)', borderRadius: 'var(--r-sm)', fontSize: '0.9rem' }}>
+          <div style={{ marginBottom: 'var(--s-4)', padding: 'var(--s-3)', background: 'var(--surface-sunk)', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem' }}>
             ⏱️ <strong>Condiciones de examen real:</strong> 10 minutos de cuenta regresiva con auto-entrega. Corrección a ciegas (los resultados y explicaciones se muestran al finalizar).
           </div>
         )}
@@ -96,7 +96,7 @@ export default function PracticeStart() {
               ))}
             </select>
           </div>
-          <div className="field" style={{ minWidth: '8rem', flex: '0 0 8rem' }}>
+          <div className="field field-compact">
             <label htmlFor="total">Cantidad de preguntas</label>
             <input
               id="total"

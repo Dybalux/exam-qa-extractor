@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api, type AnswerRow } from '../api.ts'
 import { Button, ButtonLink, Card, ErrorNotice, Loading, PageHead } from '../components.tsx'
 
@@ -47,10 +47,10 @@ function OrderList({ questionId, initial }: { questionId: number; initial: Answe
               setDragging(null)
             }}
             onDragEnd={() => setDragging(null)}
-            className={a.is_correct ? 'is-correct' : ''}
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-3)', opacity: dragging === i ? 0.5 : 1 }}
+            className={`order-item${a.is_correct ? ' is-correct' : ''}`}
+            style={{ opacity: dragging === i ? 0.5 : 1 }}
           >
-            <span aria-hidden="true" className="muted" style={{ cursor: 'grab' }}>
+            <span aria-hidden="true" className="muted drag-handle">
               ⠿
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -74,7 +74,9 @@ function OrderList({ questionId, initial }: { questionId: number; initial: Answe
               >
                 ↓
               </Button>
-              <Link to={`/questions/${questionId}/answers/${a.id}/edit`}>Editar</Link>
+              <ButtonLink to={`/questions/${questionId}/answers/${a.id}/edit`} variant="quiet" small>
+                Editar
+              </ButtonLink>
             </div>
           </li>
         ))}
@@ -111,7 +113,7 @@ export default function AnswerManage() {
         </ButtonLink>
       </div>
       <Card
-        title="Respuestas — arrastra o usa las flechas para reordenar"
+        title="Respuestas — usa las flechas para reordenar"
         aside={<span className="muted">{data.answers.length} respuesta(s)</span>}
       >
         {data.answers.length === 0 ? (

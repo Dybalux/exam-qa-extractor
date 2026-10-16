@@ -60,7 +60,7 @@ export default function BackupCard() {
           <Button variant="quiet" onClick={() => input.current?.click()}>
             Elegir archivo…
           </Button>
-          <span className="muted">{file ? file.name : 'Ningún archivo seleccionado'}</span>
+          <span className="muted file-name">{file ? file.name : 'Ningún archivo seleccionado'}</span>
           <Button disabled={!file || check.isPending} onClick={() => file && check.mutate(file)}>
             {check.isPending ? 'Analizando…' : 'Vista previa'}
           </Button>

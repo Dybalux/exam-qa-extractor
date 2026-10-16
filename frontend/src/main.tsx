@@ -6,7 +6,13 @@ import './index.css'
 import App from './App.tsx'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
 })
 
 createRoot(document.getElementById('root')!).render(

@@ -39,7 +39,9 @@ export default function BulkUpload() {
           <div className="field">
             <label htmlFor="file">Imagen del examen *</label>
             <label htmlFor="file" className={`dropzone${file ? ' has-file' : ''}`}>
-              <strong>{file ? file.name : 'Arrastra una imagen o haz clic para seleccionar'}</strong>
+              <strong className="file-name">
+                {file ? file.name : 'Toca para seleccionar o arrastra una imagen'}
+              </strong>
               <span className="hint">JPEG, PNG, PDF — máx. 10 MB</span>
               <input
                 id="file"

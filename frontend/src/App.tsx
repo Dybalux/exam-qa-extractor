@@ -1,4 +1,5 @@
-import { Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { Layout, PageHead, ButtonLink } from './components.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import PracticeStart from './pages/PracticeStart.tsx'
@@ -18,6 +19,14 @@ import AnswerManage from './pages/AnswerManage.tsx'
 import Analytics from './pages/Analytics.tsx'
 import WeakAreas from './pages/WeakAreas.tsx'
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
+
 function NotFound() {
   return (
     <div className="stack">
@@ -31,7 +40,9 @@ function NotFound() {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="practice" element={<PracticeStart />} />
@@ -55,5 +66,6 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+    </>
   )
 }

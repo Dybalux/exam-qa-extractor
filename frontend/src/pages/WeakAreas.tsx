@@ -40,20 +40,20 @@ export default function WeakAreas() {
                   <th>Tema</th>
                   <th>Precisión</th>
                   <th>Correctas / Total</th>
-                  <th></th>
+                  <th className="col-actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {weak.map((a) => (
                   <tr key={a.topic}>
-                    <td>
+                    <td data-label="Tema">
                       <span className="pill">{a.topic}</span>
                     </td>
-                    <td style={{ minWidth: '10rem' }}>
-                      <div className="row" style={{ flexWrap: 'nowrap' }}>
+                    <td className="cell-meter" data-label="Precisión">
+                      <div className="row" style={{ flexWrap: 'nowrap', width: '100%' }}>
                         <div
                           className="meter"
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, minWidth: '6rem' }}
                           role="progressbar"
                           aria-label={`${a.topic}, precisión`}
                           aria-valuenow={Math.round(a.accuracy_pct)}
@@ -65,13 +65,17 @@ export default function WeakAreas() {
                         <span className="num">{pct(a.accuracy_pct)}</span>
                       </div>
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Correctas / Total">
                       {a.correct} / {a.total}
                     </td>
-                    <td>
+                    <td className="col-actions">
                       <div className="table-actions">
-                        <Link to={`/practice?topic=${encodeURIComponent(a.topic)}`}>▶ Practicar</Link>
-                        <Link to={`/questions?topic=${encodeURIComponent(a.topic)}`}>Ver preguntas</Link>
+                        <ButtonLink to={`/practice?topic=${encodeURIComponent(a.topic)}`} small>
+                          ▶ Practicar
+                        </ButtonLink>
+                        <ButtonLink to={`/questions?topic=${encodeURIComponent(a.topic)}`} variant="quiet" small>
+                          Ver preguntas
+                        </ButtonLink>
                       </div>
                     </td>
                   </tr>
@@ -97,16 +101,22 @@ export default function WeakAreas() {
               <tbody>
                 {history.map((s) => (
                   <tr key={s.session_id}>
-                    <td>
+                    <td data-label="Modo">
                       <Link to={s.is_completed ? `/practice/${s.session_id}/results` : `/practice/${s.session_id}`}>
                         {modeLabel(s.mode)}
                       </Link>
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Progreso">
                       {s.questions_answered}/{s.total_questions}
                     </td>
-                    <td className="num">{pct(s.accuracy_pct)}</td>
-                    <td className="num">{formatDuration(s.total_time_seconds)}</td>
+                    <td className="num" data-label="Precisión">
+                      <span className={`pill ${s.accuracy_pct >= 60 ? 'pill-right' : 'pill-wrong'}`}>
+                        {pct(s.accuracy_pct)}
+                      </span>
+                    </td>
+                    <td className="num" data-label="Tiempo">
+                      {formatDuration(s.total_time_seconds)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

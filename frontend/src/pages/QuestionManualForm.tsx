@@ -71,7 +71,7 @@ export default function QuestionManualForm() {
                 ))}
               </select>
             </div>
-            <div className="field" style={{ flex: '0 0 9rem', minWidth: '8rem' }}>
+            <div className="field field-compact">
               <label htmlFor="q-order">Número en el examen</label>
               <input
                 id="q-order"
