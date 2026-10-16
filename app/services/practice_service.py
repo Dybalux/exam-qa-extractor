@@ -171,11 +171,16 @@ class PracticeService:
 
         return practice_session
 
-    async def complete_session(self, session_id: int) -> PracticeSession:
+    async def complete_session(
+        self,
+        session_id: int,
+        lockout_reason: str | None = None,
+    ) -> PracticeSession:
         """Mark a practice session as completed.
 
         Args:
             session_id: Session ID
+            lockout_reason: Optional reason if session was terminated due to anti-cheat lockout
 
         Returns:
             Updated session
@@ -187,6 +192,16 @@ class PracticeService:
         practice_session = await self.get_session(session_id)
 
         if practice_session.is_completed:
+            if lockout_reason:
+                curr_filters = dict(practice_session.filters or {})
+                anti_cheat = dict(curr_filters.get("anti_cheat") or {})
+                anti_cheat["locked_out"] = True
+                anti_cheat["lockout_reason"] = lockout_reason
+                curr_filters["anti_cheat"] = anti_cheat
+                practice_session.filters = curr_filters
+                await self.session.commit()
+                await self.session.refresh(practice_session)
+                return practice_session
             raise ValidationError(f"Session {session_id} is already completed")
 
         now = datetime.now(timezone.utc)
@@ -199,13 +214,22 @@ class PracticeService:
         elapsed = now - started_at
         practice_session.total_time_seconds = int(elapsed.total_seconds())
 
+        if lockout_reason:
+            curr_filters = dict(practice_session.filters or {})
+            anti_cheat = dict(curr_filters.get("anti_cheat") or {})
+            anti_cheat["locked_out"] = True
+            anti_cheat["lockout_reason"] = lockout_reason
+            curr_filters["anti_cheat"] = anti_cheat
+            practice_session.filters = curr_filters
+
         await self.session.commit()
         await self.session.refresh(practice_session)
 
         logger.info(
             f"Completed session {session_id} "
             f"(accuracy={practice_session.accuracy:.1f}%, "
-            f"time={practice_session.total_time_seconds}s)"
+            f"time={practice_session.total_time_seconds}s, "
+            f"lockout={lockout_reason})"
         )
         return practice_session
 
@@ -533,6 +557,83 @@ class PracticeService:
         )
         responses = responses_result.scalars().all()
 
+        anti_cheat = (practice_session.filters or {}).get("anti_cheat") or {}
+        lockout_reason = (
+            anti_cheat.get("lockout_reason") if anti_cheat.get("locked_out") else None
+        )
+
+        blueprint_ids = (
+            (practice_session.filters or {}).get("question_ids")
+            if practice_session.mode == PracticeMode.EXAM_SIMULATION.value
+            else None
+        )
+
+        if blueprint_ids is not None:
+            total_questions = (
+                len(blueprint_ids)
+                if blueprint_ids
+                else practice_session.total_questions
+            )
+            q_res = await self.session.execute(
+                select(Question)
+                .options(selectinload(Question.answers))
+                .where(Question.id.in_(blueprint_ids))
+            )
+            q_map = {q.id: q for q in q_res.scalars().all()}
+            resp_map = {r.question_id: r for r in responses}
+
+            responses_detail = []
+            answered_count = 0
+            for qid in blueprint_ids:
+                if qid in resp_map:
+                    r = resp_map[qid]
+                    detail = self._build_response_detail(r)
+                    if r.selected_answer_id is not None:
+                        answered_count += 1
+                    responses_detail.append(detail)
+                elif qid in q_map:
+                    q = q_map[qid]
+                    correct = q.correct_answer
+                    responses_detail.append(
+                        {
+                            "question_id": q.id,
+                            "question_text": q.question_text,
+                            "selected_answer_id": None,
+                            "selected_answer_text": None,
+                            "is_correct": False,
+                            "correct_answer_text": correct.answer_text
+                            if correct
+                            else None,
+                            "explanation": correct.explanation if correct else None,
+                            "time_spent_seconds": 0,
+                            "was_flagged": False,
+                            "skipped": True,
+                            "is_skipped": True,
+                        }
+                    )
+
+            skipped_count = max(0, total_questions - answered_count)
+            accuracy = (
+                (practice_session.correct_count / total_questions * 100.0)
+                if total_questions > 0
+                else 0.0
+            )
+
+            return {
+                "session_id": session_id,
+                "mode": practice_session.mode,
+                "is_completed": practice_session.is_completed,
+                "total_questions": total_questions,
+                "questions_answered": answered_count,
+                "correct_count": practice_session.correct_count,
+                "incorrect_count": practice_session.incorrect_count,
+                "skipped_count": skipped_count,
+                "accuracy": accuracy,
+                "total_time_seconds": practice_session.total_time_seconds,
+                "lockout_reason": lockout_reason,
+                "responses": responses_detail,
+            }
+
         return {
             "session_id": session_id,
             "mode": practice_session.mode,
@@ -544,6 +645,7 @@ class PracticeService:
             "skipped_count": practice_session.skipped_count,
             "accuracy": practice_session.accuracy,
             "total_time_seconds": practice_session.total_time_seconds,
+            "lockout_reason": lockout_reason,
             "responses": [self._build_response_detail(r) for r in responses],
         }
 
@@ -571,6 +673,7 @@ class PracticeService:
             "time_spent_seconds": r.time_spent_seconds,
             "was_flagged": r.was_flagged,
             "skipped": r.selected_answer_id is None,
+            "is_skipped": r.selected_answer_id is None,
         }
 
     # ------------------------------------------------------------------

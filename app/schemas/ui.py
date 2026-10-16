@@ -123,6 +123,10 @@ class SkipQuestionRequest(BaseModel):
     time_spent_seconds: int = Field(default=0, ge=0)
 
 
+class CompleteSessionRequest(BaseModel):
+    lockout_reason: str | None = None
+
+
 class AnswerFeedback(BaseModel):
     """Instant feedback after submitting an answer."""
 

@@ -21,6 +21,32 @@ export default function PracticeResults() {
     <div className="stack" style={{ gap: 'var(--s-6)' }}>
       <PageHead title={`Resultados de la sesión · ${modeLabel(data.mode)}`} />
 
+      {data.lockout_reason && (
+        <div
+          style={{
+            padding: 'var(--s-4)',
+            background: 'var(--wrong-soft)',
+            border: '2px solid var(--wrong)',
+            borderRadius: 'var(--radius)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--s-3)',
+          }}
+        >
+          <span style={{ fontSize: '2rem' }}>🚫</span>
+          <div>
+            <strong style={{ color: 'var(--wrong)', fontSize: '1.05rem' }}>
+              Examen finalizado anticipadamente por sanción de anti-cheat
+            </strong>
+            <p style={{ margin: 'var(--s-1) 0 0', fontSize: '0.9rem', color: 'var(--ink)' }}>
+              {data.lockout_reason === 'focus_lost'
+                ? 'Se detectó cambio reiterado de pestaña o pérdida de foco de pantalla durante la simulación.'
+                : data.lockout_reason}
+            </p>
+          </div>
+        </div>
+      )}
+
       <Card>
         <div className="score">
           <strong className="num">{pct(data.accuracy)}</strong>

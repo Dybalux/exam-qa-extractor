@@ -107,6 +107,7 @@ export interface ResponseRecord {
   time_spent_seconds: number
   was_flagged: boolean
   skipped: boolean
+  is_skipped?: boolean
 }
 
 export interface PracticeResults {
@@ -120,6 +121,7 @@ export interface PracticeResults {
   skipped_count: number
   accuracy: number
   total_time_seconds: number | null
+  lockout_reason?: string | null
   responses: ResponseRecord[]
 }
 
@@ -304,6 +306,7 @@ export const api = {
   practiceOptions: () => request<PracticeOptions>('/practice/options'),
   startPractice: (input: StartPracticeInput) =>
     post<SessionProgress>('/practice/sessions', input),
+  session: (id: number) => request<SessionProgress>(`/practice/sessions/${id}`),
   currentQuestion: (id: number) =>
     request<CurrentQuestion>(`/practice/sessions/${id}/current`),
   submitAnswer: (
@@ -315,7 +318,8 @@ export const api = {
     body: { question_id: number; time_spent_seconds: number },
   ) => post<{ session: SessionProgress }>(`/practice/sessions/${id}/skip`, body),
   results: (id: number) => request<PracticeResults>(`/practice/sessions/${id}/results`),
-  completeSession: (id: number) => post<SessionProgress>(`/practice/sessions/${id}/complete`, {}),
+  completeSession: (id: number, payload?: { lockout_reason?: string | null }) =>
+    post<SessionProgress>(`/practice/sessions/${id}/complete`, payload ?? {}),
   examPaper: (id: number) => request<ExamPaperResponse>(`/practice/sessions/${id}/paper`),
 
   topics: () => request<TopicOption[]>('/topics'),

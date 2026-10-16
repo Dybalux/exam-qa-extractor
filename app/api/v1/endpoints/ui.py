@@ -24,6 +24,7 @@ from app.dependencies import (
 from app.models.practice_session import PracticeSession
 from app.schemas.ui import (
     AnswerFeedback,
+    CompleteSessionRequest,
     CurrentQuestionResponse,
     DashboardResponse,
     ExamPaperQuestion,
@@ -131,6 +132,20 @@ async def ui_practice_create(
             ) from exc
         raise
     response.set_cookie("session_id", user_session_id, max_age=_COOKIE_MAX_AGE)
+    return _progress(session)
+
+
+@router.get(
+    "/practice/sessions/{session_id}",
+    response_model=SessionProgress,
+    tags=["ui"],
+)
+async def ui_practice_session(
+    session_id: int,
+    service: PracticeService = Depends(get_practice_service),
+) -> SessionProgress:
+    """Get metadata and current progress for a practice session."""
+    session = await service.get_session(session_id)
     return _progress(session)
 
 
@@ -258,12 +273,16 @@ async def ui_practice_results(
 )
 async def ui_practice_complete(
     session_id: int,
+    payload: CompleteSessionRequest | None = None,
     service: PracticeService = Depends(get_practice_service),
 ) -> SessionProgress:
-    """Complete a practice session explicitly (e.g. on exam simulation timeout)."""
+    """Complete a practice session explicitly (e.g. on exam simulation timeout or anti-cheat lockout)."""
+    reason = payload.lockout_reason if payload else None
     session = await service.get_session(session_id)
     if not session.is_completed:
-        session = await service.complete_session(session_id)
+        session = await service.complete_session(session_id, lockout_reason=reason)
+    elif reason:
+        session = await service.complete_session(session_id, lockout_reason=reason)
     return _progress(session)
 
 

@@ -16,6 +16,7 @@ class ResponseRecord(BaseModel):
     time_spent_seconds: int
     was_flagged: bool
     skipped: bool = False
+    is_skipped: bool = False
 
 
 class SessionResults(BaseModel):
@@ -31,4 +32,5 @@ class SessionResults(BaseModel):
     skipped_count: int
     accuracy: float
     total_time_seconds: int | None
+    lockout_reason: str | None = None
     responses: list[ResponseRecord]

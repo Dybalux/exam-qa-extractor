@@ -309,3 +309,97 @@ async def test_exam_paper_endpoint_and_answer_change(
     # Paper reflects new selection
     paper2 = (await client.get(f"{BASE}/practice/sessions/{sid}/paper")).json()
     assert paper2["questions"][0]["selected_answer_id"] == right_id
+
+
+@pytest.mark.asyncio
+async def test_ui_practice_complete_with_anti_cheat_lockout(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed(db_session, n_questions=2)
+    session = await _start(client, mode="exam_simulation", total_questions=2)
+    sid = session["session_id"]
+
+    # Complete with anti-cheat lockout reason
+    res = await client.post(
+        f"{BASE}/practice/sessions/{sid}/complete",
+        json={"lockout_reason": "focus_lost"},
+    )
+    assert res.status_code == 200
+    assert res.json()["is_completed"] is True
+
+    # Results include the lockout_reason
+    res_results = await client.get(f"{BASE}/practice/sessions/{sid}/results")
+    assert res_results.status_code == 200
+    results_data = res_results.json()
+    assert results_data["is_completed"] is True
+    assert results_data["lockout_reason"] == "focus_lost"
+
+
+@pytest.mark.asyncio
+async def test_ui_practice_session_metadata(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed(db_session, n_questions=3)
+    session = await _start(client, mode="random", total_questions=3)
+    sid = session["session_id"]
+
+    res = await client.get(f"{BASE}/practice/sessions/{sid}")
+    assert res.status_code == 200
+    meta = res.json()
+    assert meta["session_id"] == sid
+    assert meta["mode"] == "random"
+    assert meta["total_questions"] == 3
+    assert meta["questions_answered"] == 0
+    assert meta["is_completed"] is False
+
+
+@pytest.mark.asyncio
+async def test_exam_simulation_results_includes_all_blueprint_questions(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed(db_session, n_questions=3)
+    session = await _start(client, mode="exam_simulation", total_questions=3)
+    sid = session["session_id"]
+
+    # Get paper
+    paper = (await client.get(f"{BASE}/practice/sessions/{sid}/paper")).json()
+    assert len(paper["questions"]) == 3
+    q1 = paper["questions"][0]
+    right_id = _pick(q1, "right")
+
+    # Only answer 1 of 3 questions (correctly)
+    ans_res = await client.post(
+        f"{BASE}/practice/sessions/{sid}/answer",
+        json={"question_id": q1["id"], "selected_answer_id": right_id},
+    )
+    assert ans_res.status_code == 200
+
+    # Complete session explicitly
+    comp_res = await client.post(f"{BASE}/practice/sessions/{sid}/complete")
+    assert comp_res.status_code == 200
+
+    # Get results
+    res_results = await client.get(f"{BASE}/practice/sessions/{sid}/results")
+    assert res_results.status_code == 200
+    results = res_results.json()
+
+    assert results["total_questions"] == 3
+    assert results["questions_answered"] == 1
+    assert results["correct_count"] == 1
+    assert results["incorrect_count"] == 0
+    assert results["skipped_count"] == 2
+    assert results["accuracy"] == pytest.approx(33.33, rel=1e-2)
+    assert len(results["responses"]) == 3
+
+    # First question is answered
+    assert results["responses"][0]["question_id"] == q1["id"]
+    assert results["responses"][0]["selected_answer_id"] == right_id
+    assert results["responses"][0]["is_correct"] is True
+    assert results["responses"][0]["skipped"] is False
+
+    # Second and third questions are unattempted/skipped
+    for r in results["responses"][1:]:
+        assert r["selected_answer_id"] is None
+        assert r["is_correct"] is False
+        assert r["skipped"] is True
+        assert r["is_skipped"] is True
