@@ -113,3 +113,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "magic"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fitz"
+ignore_missing_imports = true

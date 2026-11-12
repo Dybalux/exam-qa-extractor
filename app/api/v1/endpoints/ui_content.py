@@ -38,6 +38,7 @@ from app.dependencies import (
     get_search_service,
     get_storage_service,
 )
+from app.models.answer import Answer
 from app.models.exam import Exam
 from app.schemas.ui import (
     AnalyticsResponse,
@@ -361,7 +362,7 @@ async def ui_question_delete(
 _ONE_CORRECT = "Solo puede haber una respuesta correcta por pregunta."
 
 
-async def _own_answer(a_svc: AnswerService, question_id: int, answer_id: int):
+async def _own_answer(a_svc: AnswerService, question_id: int, answer_id: int) -> Answer:
     """Fetch an answer, 404 when it does not belong to ``question_id``."""
     answer = await a_svc.get_answer(answer_id)
     if answer.question_id != question_id:
