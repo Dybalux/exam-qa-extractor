@@ -2,17 +2,13 @@
 
 from fastapi import APIRouter
 
-from app.api import (
-    exams,
-    import_export,
-)
+from app.api import import_export
 from app.api.v1.endpoints.subjects import router as subjects_router
 from app.api.v1.endpoints.ui import router as ui_router
 from app.api.v1.endpoints.ui_content import router as ui_content_router
 
 api_router = APIRouter()
 
-api_router.include_router(exams.router, prefix="/exams", tags=["exams"])
 # Empty prefix: the export/import endpoints live at /api/v1/{export,import},
 # NOT nested under /exams. The /api/v1 part comes from app/main.py.
 api_router.include_router(import_export.router, prefix="", tags=["import-export"])

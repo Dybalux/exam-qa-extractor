@@ -15,16 +15,16 @@ async def test_health_returns_ok(client):
 
 @pytest.mark.asyncio
 async def test_list_exams_empty(client):
-    """GET /api/v1/exams/ returns empty list on a fresh DB."""
-    resp = await client.get("/api/v1/exams/")
+    """GET /api/v1/ui/exams returns empty list on a fresh DB."""
+    resp = await client.get("/api/v1/ui/exams")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
 @pytest.mark.asyncio
 async def test_missing_exam_returns_404(client):
-    """GET /api/v1/exams/999999 returns 404 with global handler shape."""
-    resp = await client.get("/api/v1/exams/999999")
+    """GET /api/v1/ui/exams/999999 returns 404 with global handler shape."""
+    resp = await client.get("/api/v1/ui/exams/999999")
     assert resp.status_code == 404
     body = resp.json()
     assert "detail" in body

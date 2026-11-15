@@ -76,6 +76,7 @@ _COOKIE_MAX_AGE = 86400
 def _exam_item(exam: Exam) -> ExamListItem:
     return ExamListItem(
         id=exam.id,
+        uuid=exam.uuid,
         partial_number=exam.partial_number,
         exam_date=exam.exam_date,
         topic_tags=exam.topic_tags,

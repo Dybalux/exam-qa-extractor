@@ -18,6 +18,7 @@ export interface ProgressBucket {
 
 export interface ExamSummary {
   id: number
+  uuid: string
   partial_number: number
   exam_date: string | null
   topic_tags: string | null

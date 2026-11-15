@@ -1,13 +1,14 @@
-"""End-to-end tests proving the new `uuid` field reaches the HTTP wire.
+"""End-to-end tests proving the `uuid` field reaches the HTTP wire.
 
 The schema-level tests in `tests/schemas/test_uuid_exposure.py` prove that
 the Pydantic response models include `uuid`. Those tests serialize in
 isolation, without going through FastAPI's request/response machinery.
-This file proves the field actually flows through the full HTTP stack:
+This file proves the field actually flows through the full HTTP stack of
+the SPA-facing endpoints:
 
-    POST /api/v1/exams/      -> response body must contain uuid
-    GET  /api/v1/exams/{id}  -> response body must contain the same uuid
-    GET  /api/v1/exams/      -> every list item must contain a uuid
+    POST /api/v1/ui/exams       -> response body must contain uuid
+    GET  /api/v1/ui/exams/{id}  -> exam payload must contain the same uuid
+    GET  /api/v1/ui/exams       -> every list item must contain a uuid
 
 These tests use the `client` fixture from `tests/conftest.py`, which
 wires an `httpx.AsyncClient` to the FastAPI app via `ASGITransport` and
@@ -30,6 +31,8 @@ from app.models.answer import Answer  # noqa: F401
 from app.models.exam import Exam  # noqa: F401
 from app.models.question import Question  # noqa: F401
 
+BASE = "/api/v1/ui"
+
 # Canonical uuid4 regex: 8-4-4-4-12 hex chars, with the version nibble
 # being `4` and the variant nibble being one of `[89ab]`.
 _UUID4_RE = re.compile(
@@ -51,9 +54,9 @@ def _assert_is_uuid4(value: object, context: str) -> str:
 async def test_create_exam_response_includes_uuid_on_wire(
     client: AsyncClient,
 ) -> None:
-    """POST /api/v1/exams/ must return a 201 with `uuid` in the body."""
+    """POST /api/v1/ui/exams must return a 201 with `uuid` in the body."""
     response = await client.post(
-        "/api/v1/exams/",
+        f"{BASE}/exams",
         json={
             "partial_number": 1,
             "exam_date": "2024-06-15",
@@ -66,16 +69,16 @@ async def test_create_exam_response_includes_uuid_on_wire(
     assert "uuid" in body, (
         f"Response body missing 'uuid' field. Got keys: {sorted(body)}"
     )
-    _assert_is_uuid4(body["uuid"], "POST /api/v1/exams/ response")
+    _assert_is_uuid4(body["uuid"], "POST /ui/exams response")
 
 
 @pytest.mark.asyncio
 async def test_get_exam_response_includes_same_uuid_on_wire(
     client: AsyncClient,
 ) -> None:
-    """GET /api/v1/exams/{id} must return the same uuid the POST returned."""
+    """GET /api/v1/ui/exams/{id} must return the same uuid the POST returned."""
     create_resp = await client.post(
-        "/api/v1/exams/",
+        f"{BASE}/exams",
         json={
             "partial_number": 2,
             "exam_date": "2024-07-20",
@@ -87,9 +90,9 @@ async def test_get_exam_response_includes_same_uuid_on_wire(
     exam_id = created["id"]
     created_uuid = _assert_is_uuid4(created["uuid"], "POST response uuid")
 
-    get_resp = await client.get(f"/api/v1/exams/{exam_id}")
+    get_resp = await client.get(f"{BASE}/exams/{exam_id}")
     assert get_resp.status_code == 200, get_resp.text
-    fetched = get_resp.json()
+    fetched = get_resp.json()["exam"]
 
     assert "uuid" in fetched, (
         f"GET response missing 'uuid' field. Got keys: {sorted(fetched)}"
@@ -104,7 +107,7 @@ async def test_get_exam_response_includes_same_uuid_on_wire(
 async def test_list_exams_includes_uuid_per_item_on_wire(
     client: AsyncClient,
 ) -> None:
-    """GET /api/v1/exams/ must return a list where every item has a uuid."""
+    """GET /api/v1/ui/exams must return a list where every item has a uuid."""
     # Create two distinct exams. partial_number is constrained to 1..4
     # by ExamService.create_exam, so we use distinct values within that
     # range and distinct dates to avoid the duplicate-guard raising.
@@ -113,11 +116,11 @@ async def test_list_exams_includes_uuid_per_item_on_wire(
         {"partial_number": 2, "exam_date": "2024-02-20", "topic_tags": "b"},
     ]
     for idx, payload in enumerate(payloads):
-        resp = await client.post("/api/v1/exams/", json=payload)
+        resp = await client.post(f"{BASE}/exams", json=payload)
         assert resp.status_code == 201, resp.text
         _assert_is_uuid4(resp.json()["uuid"], f"create #{idx} response")
 
-    list_resp = await client.get("/api/v1/exams/")
+    list_resp = await client.get(f"{BASE}/exams")
     assert list_resp.status_code == 200, list_resp.text
     items = list_resp.json()
     assert isinstance(items, list)

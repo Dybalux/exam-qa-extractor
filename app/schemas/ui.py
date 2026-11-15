@@ -22,6 +22,7 @@ class ExamSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    uuid: str
     partial_number: int
     exam_date: date | None = None
     topic_tags: str | None = None
