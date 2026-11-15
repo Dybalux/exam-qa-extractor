@@ -52,7 +52,7 @@ export default function ReviewQueue() {
                   <th>Pregunta</th>
                   <th>Confianza</th>
                   <th>Tema</th>
-                  <th>Examen</th>
+                  <th className="col-nowrap">Examen</th>
                   <th className="col-actions">Acciones</th>
                 </tr>
               </thead>
@@ -76,7 +76,7 @@ export default function ReviewQueue() {
                     <td data-label="Tema">
                       <span className="pill">{q.topic}</span>
                     </td>
-                    <td data-label="Examen">
+                    <td className="col-nowrap" data-label="Examen">
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>
                     </td>
                     <td className="col-actions">

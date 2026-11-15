@@ -1480,8 +1480,10 @@ legend {
     display: table-row-group;
   }
 
+  .table tr,
   .table tbody tr {
     display: table-row;
+    width: auto;
     background: transparent;
     border: 0;
     border-radius: 0;

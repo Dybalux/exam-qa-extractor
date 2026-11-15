@@ -122,7 +122,7 @@ export default function QuestionList() {
               <thead>
                 <tr>
                   <th>Pregunta</th>
-                  <th>Examen</th>
+                  <th className="col-nowrap">Examen</th>
                   <th>Tema</th>
                   <th>Estado</th>
                   <th className="col-actions">Acciones</th>
@@ -139,7 +139,7 @@ export default function QuestionList() {
                         <div className="hint">OCR: {Math.round(q.confidence_score)}%</div>
                       )}
                     </td>
-                    <td data-label="Examen">
+                    <td className="col-nowrap" data-label="Examen">
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>
                     </td>
                     <td data-label="Tema">
