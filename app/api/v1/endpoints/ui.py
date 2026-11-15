@@ -122,6 +122,7 @@ async def ui_practice_create(
             exam_id=payload.exam_id,
             filters={"topic": payload.topic} if payload.topic else None,
             total_questions=payload.total_questions,
+            review_question_ids=payload.question_ids,
         )
     except ValidationError as exc:
         # Only error_review gets the friendly message; other validation
@@ -129,6 +130,15 @@ async def ui_practice_create(
         if payload.mode == PracticeMode.ERROR_REVIEW.value:
             raise HTTPException(
                 status_code=422, detail="Todavía no tienes errores para revisar."
+            ) from exc
+        if "filters" in exc.details:
+            # The "no questions for these filters" failure (e.g. an empty exam).
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "No hay preguntas disponibles para los filtros elegidos. "
+                    "Agrega preguntas con al menos una respuesta correcta."
+                ),
             ) from exc
         raise
     response.set_cookie("session_id", user_session_id, max_age=_COOKIE_MAX_AGE)

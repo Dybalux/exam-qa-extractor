@@ -14,7 +14,8 @@ export default function PracticeResults() {
     enabled: Number.isFinite(sessionId),
   })
 
-  // error_review draws from every question you ever missed, not only this attempt.
+  // Reviews exactly the questions missed in this session (sent by id), so the
+  // count on the button is what the new session will contain.
   const reviewErrors = useMutation({
     mutationFn: api.startPractice,
     onSuccess: (session) => {
@@ -83,10 +84,13 @@ export default function PracticeResults() {
                 exam_id: null,
                 topic: null,
                 total_questions: Math.min(100, wrong.length),
+                question_ids: wrong.slice(0, 100).map((r) => r.question_id),
               })
             }
           >
-            {reviewErrors.isPending ? 'Iniciando…' : 'Repasar mis errores'}
+            {reviewErrors.isPending
+              ? 'Iniciando…'
+              : `Repasar mis errores (${wrong.length} ${wrong.length === 1 ? 'pregunta' : 'preguntas'})`}
           </Button>
         )}
         <ButtonLink to="/" variant="quiet" large>

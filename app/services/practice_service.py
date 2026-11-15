@@ -47,6 +47,7 @@ class PracticeService:
         exam_id: int | None = None,
         filters: dict | None = None,
         total_questions: int = 10,
+        review_question_ids: list[int] | None = None,
     ) -> PracticeSession:
         """Create a new practice session.
 
@@ -56,6 +57,8 @@ class PracticeService:
             exam_id: Optional exam to restrict questions
             filters: Optional dict with keys: topic
             total_questions: Number of questions for this session (1-100)
+            review_question_ids: error_review only. Review exactly these
+                questions instead of every historical mistake.
 
         Returns:
             Created practice session
@@ -79,7 +82,10 @@ class PracticeService:
         # Error review mode: pre-filter pool to previously failed questions
         question_ids = None
         if mode == PracticeMode.ERROR_REVIEW.value:
-            question_ids = await self._get_failed_question_ids(user_session_id)
+            if review_question_ids:
+                question_ids = list(review_question_ids)
+            else:
+                question_ids = await self._get_failed_question_ids(user_session_id)
             # Early guard: no prior failures means error_review has nothing to
             # review. Raise explicitly rather than relying on the empty-list
             # filter behaviour in _get_available_questions.
@@ -106,6 +112,9 @@ class PracticeService:
         actual_total = min(total_questions, len(available))
 
         session_filters = dict(filters) if filters else {}
+        if mode == PracticeMode.ERROR_REVIEW.value and review_question_ids:
+            # Pin the pool so next_question keeps reviewing this exact set.
+            session_filters["question_ids"] = [q.id for q in available]
         if mode == PracticeMode.EXAM_SIMULATION.value:
             blueprint = None
             if exam_id is not None:
@@ -269,8 +278,13 @@ class PracticeService:
         # For exam_simulation, restrict to the preselected blueprint question IDs.
         question_ids = None
         if practice_session.mode == PracticeMode.ERROR_REVIEW.value:
-            question_ids = await self._get_failed_question_ids(
-                practice_session.user_session_id
+            pinned = (practice_session.filters or {}).get("question_ids")
+            question_ids = (
+                pinned
+                if pinned is not None
+                else await self._get_failed_question_ids(
+                    practice_session.user_session_id
+                )
             )
         elif practice_session.mode == PracticeMode.EXAM_SIMULATION.value:
             question_ids = (practice_session.filters or {}).get("question_ids")

@@ -131,6 +131,8 @@ export interface StartPracticeInput {
   exam_id: number | null
   topic: string | null
   total_questions: number
+  /** error_review only: review exactly these questions. */
+  question_ids?: number[]
 }
 
 export interface ExamListItem extends ExamSummary {

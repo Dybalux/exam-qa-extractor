@@ -64,6 +64,9 @@ class PracticeSessionCreate(BaseModel):
     exam_id: int | None = None
     topic: str | None = None
     total_questions: int = Field(default=10, ge=1, le=100)
+    # error_review only: review exactly these questions (e.g. the ones missed in
+    # the session just finished) instead of every historical mistake.
+    question_ids: list[int] | None = Field(default=None, max_length=100)
 
 
 class SessionProgress(BaseModel):

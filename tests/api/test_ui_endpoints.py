@@ -97,7 +97,7 @@ async def test_start_without_questions_is_422(client: AsyncClient) -> None:
         f"{BASE}/practice/sessions", json={"mode": "random", "total_questions": 5}
     )
     assert response.status_code == 422
-    assert "No questions available" in response.json()["detail"]
+    assert "No hay preguntas disponibles" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -403,3 +403,65 @@ async def test_exam_simulation_results_includes_all_blueprint_questions(
         assert r["is_correct"] is False
         assert r["skipped"] is True
         assert r["is_skipped"] is True
+
+
+@pytest.mark.asyncio
+async def test_error_review_with_explicit_question_ids_reviews_exactly_those(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    questions = await _seed(db_session, n_questions=3)
+    chosen = {questions[0].id, questions[1].id}
+
+    session = await _start(
+        client,
+        mode="error_review",
+        total_questions=2,
+        question_ids=sorted(chosen),
+    )
+    assert session["total_questions"] == 2
+
+    seen: set[int] = set()
+    for _ in range(2):
+        current = (
+            await client.get(
+                f"{BASE}/practice/sessions/{session['session_id']}/current"
+            )
+        ).json()
+        question = current["question"]
+        assert question is not None
+        seen.add(question["id"])
+        answered = await client.post(
+            f"{BASE}/practice/sessions/{session['session_id']}/answer",
+            json={
+                "question_id": question["id"],
+                "selected_answer_id": _pick(question, "right"),
+                "time_spent_seconds": 1,
+            },
+        )
+        assert answered.status_code == 200, answered.text
+
+    assert seen == chosen
+    done = (
+        await client.get(f"{BASE}/practice/sessions/{session['session_id']}/current")
+    ).json()
+    assert done["question"] is None
+
+
+@pytest.mark.asyncio
+async def test_start_on_empty_exam_returns_friendly_spanish_422(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    questions = await _seed(db_session, n_questions=1)
+    empty = Exam(
+        partial_number=4,
+        subject_id=(await db_session.get(Exam, questions[0].exam_id)).subject_id,
+    )
+    db_session.add(empty)
+    await db_session.commit()
+
+    response = await client.post(
+        f"{BASE}/practice/sessions",
+        json={"mode": "random", "exam_id": empty.id, "total_questions": 5},
+    )
+    assert response.status_code == 422
+    assert "No hay preguntas disponibles" in response.json()["detail"]
