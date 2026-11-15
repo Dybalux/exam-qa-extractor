@@ -1,15 +1,26 @@
-import { useQuery } from '@tanstack/react-query'
-import { useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api.ts'
-import { ButtonLink, Card, ErrorNotice, Loading, PageHead } from '../components.tsx'
+import { Button, ButtonLink, Card, ErrorNotice, Loading, PageHead } from '../components.tsx'
 import { formatDuration, modeLabel, pct } from '../format.ts'
 
 export default function PracticeResults() {
   const sessionId = Number(useParams().sessionId)
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data, error, isPending } = useQuery({
     queryKey: ['practice-results', sessionId],
     queryFn: () => api.results(sessionId),
     enabled: Number.isFinite(sessionId),
+  })
+
+  // error_review draws from every question you ever missed, not only this attempt.
+  const reviewErrors = useMutation({
+    mutationFn: api.startPractice,
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      navigate(`/practice/${session.session_id}`)
+    },
   })
 
   if (isPending) return <Loading />
@@ -61,10 +72,28 @@ export default function PracticeResults() {
         <ButtonLink to="/practice" large>
           Practicar de nuevo
         </ButtonLink>
+        {wrong.length > 0 && (
+          <Button
+            variant="quiet"
+            large
+            disabled={reviewErrors.isPending}
+            onClick={() =>
+              reviewErrors.mutate({
+                mode: 'error_review',
+                exam_id: null,
+                topic: null,
+                total_questions: Math.min(100, wrong.length),
+              })
+            }
+          >
+            {reviewErrors.isPending ? 'Iniciando…' : 'Repasar mis errores'}
+          </Button>
+        )}
         <ButtonLink to="/" variant="quiet" large>
           Ir al dashboard
         </ButtonLink>
       </div>
+      {reviewErrors.error && <ErrorNotice error={reviewErrors.error} />}
 
       <Card title="Desglose por pregunta" aside={wrong.length > 0 ? <span className="pill pill-wrong">{wrong.length} por revisar</span> : undefined}>
         <ol className="review">
@@ -80,7 +109,7 @@ export default function PracticeResults() {
                     <dd>{r.correct_answer_text ?? '—'}</dd>
                   </>
                 )}
-                {r.explanation && !r.is_correct && (
+                {r.explanation && (
                   <>
                     <dt>Explicación</dt>
                     <dd>{r.explanation}</dd>
