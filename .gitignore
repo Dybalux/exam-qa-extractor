@@ -86,3 +86,7 @@ frontend/dist/
 node_modules/
 SYSTEM_PRESENTATION.md
 .agents/skills/frontend-design/SKILL.md
+# Local Pi runtime state
+.atl/
+.codegraph/
+
