@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 import { api } from '../api.ts'
 import { ButtonLink, Card, ErrorNotice, Loading, PageHead } from '../components.tsx'
 import { formatDuration, modeLabel, pct } from '../format.ts'
+import { useTopicLabel } from '../topics.ts'
 
 export default function WeakAreas() {
   const { data, error, isPending } = useQuery({
     queryKey: ['weak-areas'],
     queryFn: () => api.weakAreas(),
   })
+  const topicLabel = useTopicLabel()
 
   if (isPending) return <Loading />
   if (error) return <ErrorNotice error={error} />
@@ -44,42 +46,45 @@ export default function WeakAreas() {
                 </tr>
               </thead>
               <tbody>
-                {weak.map((a) => (
-                  <tr key={a.topic}>
-                    <td data-label="Tema">
-                      <span className="pill">{a.topic}</span>
-                    </td>
-                    <td className="cell-meter" data-label="Precisión">
-                      <div className="row" style={{ flexWrap: 'nowrap', width: '100%' }}>
-                        <div
-                          className="meter"
-                          style={{ flex: 1, minWidth: '6rem' }}
-                          role="progressbar"
-                          aria-label={`${a.topic}, precisión`}
-                          aria-valuenow={Math.round(a.accuracy_pct)}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                        >
-                          <span style={{ width: `${a.accuracy_pct}%`, background: 'var(--wrong)' }} />
+                {weak.map((a) => {
+                  const label = topicLabel(a.topic)
+                  return (
+                    <tr key={a.topic}>
+                      <td data-label="Tema">
+                        <span className="pill">{label}</span>
+                      </td>
+                      <td className="cell-meter" data-label="Precisión">
+                        <div className="row" style={{ flexWrap: 'nowrap', width: '100%' }}>
+                          <div
+                            className="meter meter-wrong"
+                            style={{ flex: 1, minWidth: '6rem' }}
+                            role="progressbar"
+                            aria-label={`${label}, precisión`}
+                            aria-valuenow={Math.round(a.accuracy_pct)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          >
+                            <span style={{ width: `${a.accuracy_pct}%` }} />
+                          </div>
+                          <span className="num">{pct(a.accuracy_pct)}</span>
                         </div>
-                        <span className="num">{pct(a.accuracy_pct)}</span>
-                      </div>
-                    </td>
-                    <td className="num" data-label="Correctas / Total">
-                      {a.correct} / {a.total}
-                    </td>
-                    <td className="col-actions">
-                      <div className="table-actions">
-                        <ButtonLink to={`/practice?topic=${encodeURIComponent(a.topic)}`} small>
-                          ▶ Practicar
-                        </ButtonLink>
-                        <ButtonLink to={`/questions?topic=${encodeURIComponent(a.topic)}`} variant="quiet" small>
-                          Ver preguntas
-                        </ButtonLink>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="num" data-label="Correctas / Total">
+                        {a.correct} / {a.total}
+                      </td>
+                      <td className="col-actions">
+                        <div className="table-actions">
+                          <ButtonLink to={`/practice?topic=${encodeURIComponent(a.topic)}`} small>
+                            ▶ Practicar
+                          </ButtonLink>
+                          <ButtonLink to={`/questions?topic=${encodeURIComponent(a.topic)}`} variant="quiet" small>
+                            Ver preguntas
+                          </ButtonLink>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

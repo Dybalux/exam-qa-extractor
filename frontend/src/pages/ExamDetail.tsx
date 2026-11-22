@@ -4,10 +4,12 @@ import { api } from '../api.ts'
 import { useDeleteExam } from '../actions.ts'
 import { Button, ButtonLink, Card, ErrorNotice, Flash, Loading, PageHead } from '../components.tsx'
 import { formatExamDate, pct } from '../format.ts'
+import { useTopicLabel } from '../topics.ts'
 
 export default function ExamDetail() {
   const id = Number(useParams().examId)
   const navigate = useNavigate()
+  const topicLabel = useTopicLabel()
   const { data, error, isPending } = useQuery({
     queryKey: ['exam', id],
     queryFn: () => api.exam(id),
@@ -114,7 +116,7 @@ export default function ExamDetail() {
                       </Link>
                     </td>
                     <td data-label="Tema">
-                      <span className="pill">{q.topic}</span>
+                      <span className="pill">{topicLabel(q.topic)}</span>
                     </td>
                     <td data-label="Estado">
                       <div className="tags">

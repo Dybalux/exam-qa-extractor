@@ -22,6 +22,7 @@
   --right: #1d8758;
   --right-soft: #d8f0e3;
   --right-line: #a9d9bf;
+  --warn: #c48a0c;
   --wrong: #c2364a;
   --wrong-soft: #f8dde1;
   --notice-wrong-ink: #7c1d2b;
@@ -93,6 +94,7 @@
     --right: #2ea043;
     --right-soft: #123824;
     --right-line: #1c5232;
+    --warn: #e3b341;
     --wrong: #f85149;
     --wrong-soft: #421517;
     --notice-wrong-ink: #ff858d;
@@ -129,6 +131,7 @@
   --right: #2ea043;
   --right-soft: #123824;
   --right-line: #1c5232;
+  --warn: #e3b341;
   --wrong: #f85149;
   --wrong-soft: #421517;
   --notice-wrong-ink: #ff858d;
@@ -654,8 +657,72 @@ a {
 .meter-top {
   display: flex;
   justify-content: space-between;
-  gap: var(--s-3);
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
   margin-bottom: var(--s-1);
+  flex-wrap: wrap;
+}
+
+.meter-link {
+  color: inherit;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.meter-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.meter-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-shrink: 0;
+}
+
+.meter-action {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.meter-action:hover {
+  text-decoration: underline;
+}
+
+.meter-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-3);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.meter-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.meter-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 99px;
+  display: inline-block;
+}
+
+.meter-dot-right {
+  background: var(--right);
+}
+
+.meter-dot-warn {
+  background: var(--warn);
+}
+
+.meter-dot-wrong {
+  background: var(--wrong);
 }
 
 .meter {
@@ -671,6 +738,18 @@ a {
   border-radius: 99px;
   background: var(--accent);
   transition: width 0.5s var(--ease);
+}
+
+.meter-right > span {
+  background: var(--right);
+}
+
+.meter-warn > span {
+  background: var(--warn);
+}
+
+.meter-wrong > span {
+  background: var(--wrong);
 }
 
 .history {
@@ -1679,6 +1758,10 @@ textarea.control {
   min-width: 0;
 }
 
+.filters .field-search {
+  grid-column: 1 / -1;
+}
+
 @media (min-width: 480px) {
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1694,6 +1777,10 @@ textarea.control {
 
   .filters .field {
     min-width: 10rem;
+  }
+
+  .filters .field-search {
+    flex: 1 1 100%;
   }
 }
 

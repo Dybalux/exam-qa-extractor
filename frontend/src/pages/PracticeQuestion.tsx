@@ -10,6 +10,7 @@ import {
 } from '../api.ts'
 import { Button, ErrorNotice, Loading } from '../components.tsx'
 import { modeLabel } from '../format.ts'
+import { useTopicLabel } from '../topics.ts'
 
 type Outcome = 'right' | 'wrong' | 'skip' | 'done'
 
@@ -48,6 +49,7 @@ function QuestionCard({
   onSkipped: () => void
   onNext: () => void
 }) {
+  const topicLabel = useTopicLabel()
   const startedAt = useRef(0)
   const [picked, setPicked] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null)
@@ -102,7 +104,7 @@ function QuestionCard({
 
   return (
     <div>
-      <span className="pill">{question.topic}</span>
+      <span className="pill">{topicLabel(question.topic)}</span>
       <p className="question-text">{question.text}</p>
 
       <ul className="options">
@@ -182,6 +184,7 @@ function ExamSimulationPaper({
   const [showConfirm, setShowConfirm] = useState(false)
   const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS)
   const [showWarningModal, setShowWarningModal] = useState(false)
+  const topicLabel = useTopicLabel()
   const startedAt = useRef(0)
   const lastViolationAt = useRef(0)
   const isSubmittingRef = useRef(false)
@@ -448,7 +451,7 @@ function ExamSimulationPaper({
       {/* Question Card */}
       <div>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--s-2)' }}>
-          <span className="pill">{currentQ.topic}</span>
+          <span className="pill">{topicLabel(currentQ.topic)}</span>
           <span className="muted" style={{ fontSize: '0.875rem' }}>
             Pregunta {currentIndex + 1} de {paper.questions.length}
           </span>

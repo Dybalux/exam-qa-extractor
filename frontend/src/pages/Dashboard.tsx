@@ -4,8 +4,19 @@ import { api, type ProgressBucket } from '../api.ts'
 import { ButtonLink, Card, ErrorNotice, Loading, PageHead } from '../components.tsx'
 import BackupCard from './BackupCard.tsx'
 import { formatDate, modeLabel, pct } from '../format.ts'
+import { useTopicLabel } from '../topics.ts'
 
-function Meters({ title, data, prefix }: { title: string; data: Record<string, ProgressBucket>; prefix?: string }) {
+function Meters({
+  title,
+  data,
+  prefix,
+  formatKey,
+}: {
+  title: string
+  data: Record<string, ProgressBucket>
+  prefix?: string
+  formatKey?: (key: string) => string
+}) {
   const entries = Object.entries(data)
   return (
     <Card title={title}>
@@ -13,26 +24,29 @@ function Meters({ title, data, prefix }: { title: string; data: Record<string, P
         <p className="muted">Aún no hay datos. Agrega preguntas con respuesta correcta para ver el progreso.</p>
       ) : (
         <ul className="meter-list">
-          {entries.map(([key, b]) => (
-            <li key={key}>
-              <div className="meter-top">
-                <span>{prefix ? `${prefix} ${key}` : key}</span>
-                <span className="muted num">
-                  {b.ready}/{b.total} listas
-                </span>
-              </div>
-              <div
-                className="meter"
-                role="progressbar"
-                aria-label={`${prefix ?? ''} ${key}, preparación`}
-                aria-valuenow={Math.round(b.readiness_pct)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <span style={{ width: `${b.readiness_pct}%` }} />
-              </div>
-            </li>
-          ))}
+          {entries.map(([key, b]) => {
+            const label = formatKey ? formatKey(key) : prefix ? `${prefix} ${key}` : key
+            return (
+              <li key={key}>
+                <div className="meter-top">
+                  <span>{label}</span>
+                  <span className="muted num">
+                    {b.ready}/{b.total} listas
+                  </span>
+                </div>
+                <div
+                  className="meter"
+                  role="progressbar"
+                  aria-label={`${label}, preparación`}
+                  aria-valuenow={Math.round(b.readiness_pct)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <span style={{ width: `${b.readiness_pct}%` }} />
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </Card>
@@ -41,6 +55,7 @@ function Meters({ title, data, prefix }: { title: string; data: Record<string, P
 
 export default function Dashboard() {
   const { data, error, isPending } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard })
+  const topicLabel = useTopicLabel()
 
   if (isPending) return <Loading />
   if (error) return <ErrorNotice error={error} />
@@ -93,7 +108,7 @@ export default function Dashboard() {
 
       <div className="dash-grid">
         <Meters title="Por examen" data={progress.by_partial} prefix="Parcial" />
-        <Meters title="Por tema" data={progress.by_topic} />
+        <Meters title="Por tema" data={progress.by_topic} formatKey={topicLabel} />
       </div>
 
       <Card title="Sesiones recientes">

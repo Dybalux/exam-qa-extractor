@@ -1,16 +1,20 @@
+import { useMemo } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type QuestionFilters } from '../api.ts'
 import { useDeleteQuestion } from '../actions.ts'
 import { Button, ButtonLink, Card, ErrorNotice, Flash, Loading, PageHead } from '../components.tsx'
-import { examLabel } from '../format.ts'
+import { examLabel, normalizeSearch } from '../format.ts'
+import { createTopicLookup } from '../topics.ts'
 
 const KEYS = ['exam_id', 'topic', 'is_ready', 'is_corrected'] as const
+type FilterKey = (typeof KEYS)[number] | 'q'
 
 export default function QuestionList() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const filters: QuestionFilters = Object.fromEntries(KEYS.map((k) => [k, params.get(k) ?? '']))
+  const search = params.get('q') ?? ''
   const { data, error, isPending } = useQuery({
     queryKey: ['questions', filters],
     queryFn: () => api.questions(filters),
@@ -18,20 +22,38 @@ export default function QuestionList() {
   })
   const remove = useDeleteQuestion()
 
-  const setFilter = (key: (typeof KEYS)[number], value: string) => {
+  const topicLabel = useMemo(() => createTopicLookup(data?.topics), [data?.topics])
+
+  const visibleQuestions = useMemo(() => {
+    const questions = data?.questions ?? []
+    const needle = normalizeSearch(search.trim())
+    if (!needle) return questions
+    return questions.filter((q) => {
+      const text = normalizeSearch(q.question_text)
+      const label = normalizeSearch(topicLabel(q.topic))
+      const slug = normalizeSearch(q.topic)
+      return text.includes(needle) || label.includes(needle) || slug.includes(needle)
+    })
+  }, [data?.questions, search, topicLabel])
+
+  const setFilter = (key: FilterKey, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
     setParams(next, { replace: true })
   }
 
+  const hasSearch = search.trim().length > 0
+  const lead = data
+    ? hasSearch
+      ? `${visibleQuestions.length} de ${data.questions.length} pregunta(s)`
+      : `${data.questions.length} pregunta(s) encontrada(s)`
+    : undefined
+
   return (
     <div className="stack" style={{ gap: 'var(--s-5)' }}>
       <Flash />
-      <PageHead
-        title="Preguntas"
-        lead={data ? `${data.questions.length} pregunta(s) encontrada(s)` : undefined}
-      />
+      <PageHead title="Preguntas" lead={lead} />
       <div className="row">
         <ButtonLink to="/questions/review" variant="quiet">
           Revisar OCR
@@ -40,6 +62,17 @@ export default function QuestionList() {
 
       <Card>
         <div className="filters">
+          <div className="field field-search">
+            <label htmlFor="f-search">Buscar</label>
+            <input
+              id="f-search"
+              type="search"
+              className="control"
+              placeholder="Buscar por enunciado o tema (ej. banquero, zombie, TLB)…"
+              value={search}
+              onChange={(e) => setFilter('q', e.target.value)}
+            />
+          </div>
           <div className="field">
             <label htmlFor="f-exam">Examen</label>
             <select
@@ -110,10 +143,14 @@ export default function QuestionList() {
         <Loading />
       ) : error ? (
         <ErrorNotice error={error} />
-      ) : data.questions.length === 0 ? (
+      ) : visibleQuestions.length === 0 ? (
         <Card flat>
           <h2>Sin preguntas</h2>
-          <p className="muted">No hay preguntas que coincidan con los filtros.</p>
+          <p className="muted">
+            {hasSearch
+              ? `No hay preguntas que coincidan con “${search.trim()}”.`
+              : 'No hay preguntas que coincidan con los filtros.'}
+          </p>
         </Card>
       ) : (
         <Card>
@@ -129,7 +166,7 @@ export default function QuestionList() {
                 </tr>
               </thead>
               <tbody>
-                {data.questions.map((q) => (
+                {visibleQuestions.map((q) => (
                   <tr key={q.id}>
                     <td className="cell-text" data-label="Pregunta">
                       <Link to={`/questions/${q.id}`}>
@@ -143,7 +180,7 @@ export default function QuestionList() {
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>
                     </td>
                     <td data-label="Tema">
-                      <span className="pill">{q.topic}</span>
+                      <span className="pill">{topicLabel(q.topic)}</span>
                     </td>
                     <td data-label="Estado">
                       <div className="tags">

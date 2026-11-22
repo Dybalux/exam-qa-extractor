@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api.ts'
 import { ButtonLink, Card, ErrorNotice, Flash, Loading, PageHead } from '../components.tsx'
+import { useTopicLabel } from '../topics.ts'
 
 export default function ReviewQueue() {
   const examId = useSearchParams()[0].get('exam_id') ?? ''
+  const topicLabel = useTopicLabel()
   const { data, error, isPending } = useQuery({
     queryKey: ['review', examId],
     queryFn: () => api.reviewQueue(examId),
@@ -74,7 +76,7 @@ export default function ReviewQueue() {
                       )}
                     </td>
                     <td data-label="Tema">
-                      <span className="pill">{q.topic}</span>
+                      <span className="pill">{topicLabel(q.topic)}</span>
                     </td>
                     <td className="col-nowrap" data-label="Examen">
                       <Link to={`/exams/${q.exam_id}`}>Examen #{q.exam_id}</Link>

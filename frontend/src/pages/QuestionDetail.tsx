@@ -3,10 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api.ts'
 import { useDeleteQuestion } from '../actions.ts'
 import { Button, ButtonLink, Card, ErrorNotice, Flash, Loading, PageHead } from '../components.tsx'
+import { useTopicLabel } from '../topics.ts'
 
 export default function QuestionDetail() {
   const id = Number(useParams().questionId)
   const navigate = useNavigate()
+  const topicLabel = useTopicLabel()
   const { data, error, isPending } = useQuery({
     queryKey: ['question', id],
     queryFn: () => api.question(id),
@@ -29,7 +31,7 @@ export default function QuestionDetail() {
       <Flash />
       <PageHead title={`Pregunta #${question.id}`} />
       <div className="row">
-        <span className="pill">{question.topic}</span>
+        <span className="pill">{topicLabel(question.topic)}</span>
         <Link to={`/exams/${question.exam_id}`}>Examen #{question.exam_id}</Link>
       </div>
       <div className="row">

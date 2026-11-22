@@ -36,3 +36,19 @@ export const splitTags = (tags: string | null | undefined) =>
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean)
+
+/** Lowercase and strip combining diacritics for accent-insensitive search. */
+export const normalizeSearch = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+export type AccuracyTone = 'right' | 'warn' | 'wrong'
+
+/** Semantic traffic-light tone aligned with the 60% weak-area threshold. */
+export function accuracyTone(accuracyPct: number): AccuracyTone {
+  if (accuracyPct >= 80) return 'right'
+  if (accuracyPct >= 60) return 'warn'
+  return 'wrong'
+}
