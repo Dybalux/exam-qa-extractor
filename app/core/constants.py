@@ -79,5 +79,10 @@ EXAM_SIMULATION_BLUEPRINTS: dict[int, dict[str, float]] = {
         "synchronization": 0.30,  # Cap. 6: Sincronización de Procesos (30%)
         "deadlock": 0.20,  # Cap. 7: Deadlocks / Abrazo Mortal (20%)
         "memory": 0.10,  # Cap. 8: Gestión de Memoria Principal (10%)
-    }
+    },
+    4: {
+        "memory": 0.25,  # Cap. 9 + TP MV: Memoria Virtual y Swap (25%)
+        "files": 0.45,  # Caps. 10-11 + TP SA: Sistemas de Archivos (45%)
+        "io": 0.30,  # Caps. 12-13 + TP E/S: Almacenamiento Masivo y E/S (30%)
+    },
 }
