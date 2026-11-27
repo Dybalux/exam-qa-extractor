@@ -35,6 +35,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.exc import IntegrityError
 
+from app.api.upload_limits import read_upload_bounded
 from app.config import get_settings
 from app.core.exceptions import (
     MalformedImportError,
@@ -151,34 +152,13 @@ async def import_envelope(
     settings = get_settings()
     max_bytes = settings.max_import_size_mb * 1024 * 1024
 
-    # 1. Read the upload body. We must read to enforce the
-    #    belt-and-suspenders size check, since ``file.size`` can be
-    #    ``None`` for some multipart sources.
-    raw = await file.read()
-    if file.size is not None and file.size > max_bytes:
-        _logger.warning(
-            "import rejected: file.size=%d exceeds %d bytes (pre-parse)",
-            file.size,
-            max_bytes,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Upload exceeds {settings.max_import_size_mb} MB ({file.size} bytes)."
-            ),
-        )
-    if len(raw) > max_bytes:
-        _logger.warning(
-            "import rejected: read length=%d exceeds %d bytes (pre-parse)",
-            len(raw),
-            max_bytes,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Upload exceeds {settings.max_import_size_mb} MB ({len(raw)} bytes)."
-            ),
-        )
+    # 1. Read the upload body in bounded chunks, rejecting early with 413
+    #    if ``file.size`` or the streamed byte count exceeds ``max_bytes``.
+    raw = await read_upload_bounded(
+        file,
+        max_bytes=max_bytes,
+        limit_label=f"{settings.max_import_size_mb} MB",
+    )
 
     # 2. Parse JSON. A parse error here yields 400 with the parser
     #    message in ``detail`` (we never reach the service).
@@ -257,7 +237,7 @@ async def import_envelope(
         # directly. If the service ever raises this, map it the same
         # way.
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=exc.message,
         ) from exc
     except IntegrityError as exc:

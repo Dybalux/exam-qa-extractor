@@ -21,6 +21,8 @@ from fastapi import (
 )
 
 from app.api.session import session_id_from_request
+from app.api.upload_limits import read_upload_bounded
+from app.config import get_settings
 from app.core.constants import AnswerType
 from app.core.exceptions import (
     ConflictError,
@@ -185,9 +187,16 @@ async def ui_exam_upload(
     if not file.filename:
         raise HTTPException(status_code=422, detail="No se proporcionó archivo")
 
+    settings = get_settings()
+    raw_bytes = await read_upload_bounded(
+        file,
+        max_bytes=settings.max_upload_size,
+        limit_label=f"{settings.max_upload_size / (1024 * 1024):.1f} MB",
+    )
+
     try:
         saved = await storage_svc.save_file(
-            file_data=io.BytesIO(await file.read()),
+            file_data=io.BytesIO(raw_bytes),
             original_filename=file.filename,
             exam_id=exam_id,
         )
