@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # OCR
     tesseract_cmd: str = "tesseract"
     tesseract_lang: str = "spa"
+    ocr_timeout_seconds: float = 30.0
 
     # App
     debug: bool = False

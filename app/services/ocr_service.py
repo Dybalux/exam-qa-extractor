@@ -1,6 +1,8 @@
 """OCR Service for text extraction using Tesseract."""
 
+import asyncio
 import logging
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +21,10 @@ settings = get_settings()
 
 # Configure Tesseract
 pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
+
+MAX_OCR_IMAGE_PIXELS = 25_000_000
+MAX_OCR_IMAGE_DIMENSION = 16_384
+PDF_RENDER_SCALE = 2.0
 
 
 @dataclass
@@ -44,16 +50,73 @@ class OCRResult:
 class OCRService:
     """Service for OCR text extraction and processing."""
 
-    def __init__(self, tesseract_cmd: str | None = None, lang: str | None = None):
+    def __init__(
+        self,
+        tesseract_cmd: str | None = None,
+        lang: str | None = None,
+        timeout: float | None = None,
+        max_pixels: int | None = None,
+        max_dimension: int | None = None,
+    ) -> None:
         """Initialize OCR service.
 
         Args:
             tesseract_cmd: Path to tesseract binary (optional, uses settings if not provided)
             lang: Language code (optional, uses settings if not provided)
+            timeout: Tesseract execution timeout in seconds (optional, uses settings if not provided)
+            max_pixels: Maximum pixel budget for images/rendered PDF pages
+            max_dimension: Maximum width or height in pixels for images/rendered PDF pages
         """
         self.tesseract_cmd = tesseract_cmd or settings.tesseract_cmd
         self.lang = lang or settings.tesseract_lang
+        self.timeout = timeout if timeout is not None else settings.ocr_timeout_seconds
+        self.max_pixels = max_pixels if max_pixels is not None else MAX_OCR_IMAGE_PIXELS
+        self.max_dimension = (
+            max_dimension if max_dimension is not None else MAX_OCR_IMAGE_DIMENSION
+        )
         self._check_tesseract()
+
+    def _validate_image_dimensions(self, width: float, height: float) -> None:
+        """Enforce dimension and total pixel bounds before image decoding or rendering."""
+        if (
+            not math.isfinite(width)
+            or not math.isfinite(height)
+            or width <= 0
+            or height <= 0
+        ):
+            raise OCRProcessingError(
+                f"Invalid image dimensions for OCR: {width}x{height}."
+            )
+        total_pixels = width * height
+        if (
+            width > self.max_dimension
+            or height > self.max_dimension
+            or total_pixels > self.max_pixels
+        ):
+            raise OCRProcessingError(
+                f"Image dimensions ({int(width)}x{int(height)}, "
+                f"{int(total_pixels)} pixels) exceed maximum OCR budget "
+                f"({self.max_pixels} pixels)."
+            )
+
+    def _load_and_validate_image(self, source: Path | BinaryIO) -> Image.Image:
+        """Open a PIL image, enforce pixel bounds before decoding, and return a detached copy."""
+        try:
+            with Image.open(source) as img:
+                width, height = img.size
+                self._validate_image_dimensions(width, height)
+                img.load()
+                copied: Image.Image = img.copy()
+                return copied
+        except OCRProcessingError:
+            raise
+        except Image.DecompressionBombError as e:
+            raise OCRProcessingError(
+                f"Image exceeds maximum safe pixel limit: {e}"
+            ) from e
+        except Exception as e:
+            logger.error("Failed to load image for OCR: %s", e)
+            raise OCRProcessingError(f"Failed to extract text: {str(e)}") from e
 
     def _check_tesseract(self) -> None:
         """Check if Tesseract is installed."""
@@ -224,7 +287,7 @@ class OCRService:
         file_data: BinaryIO,
         preprocess: bool = True,
     ) -> OCRResult:
-        """Extract text from image file.
+        """Extract text from image file without blocking the event loop.
 
         Args:
             file_data: Binary file data
@@ -236,18 +299,8 @@ class OCRService:
         Raises:
             OCRProcessingError: If extraction fails
         """
-        try:
-            # Load image
-            image = Image.open(file_data)
-
-            # Process the image
-            return await self.extract_text_from_image(image, preprocess)
-
-        except OCRProcessingError:
-            raise
-        except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            raise OCRProcessingError(f"Failed to extract text: {str(e)}")
+        image = await asyncio.to_thread(self._load_and_validate_image, file_data)
+        return await self.extract_text_from_image(image, preprocess)
 
     def _extract_text_from_pdf_direct(self, file_path: Path) -> str | None:
         """Try to extract text directly from PDF (no OCR).
@@ -259,16 +312,16 @@ class OCRService:
             Extracted text or None if no text found
         """
         try:
-            doc = fitz.open(file_path)
-            text_parts = []
+            with fitz.open(file_path) as doc:
+                if len(doc) == 0:
+                    return None
 
-            for page_num in range(min(len(doc), 5)):  # Process up to 5 pages
-                page = doc[page_num]
-                text = page.get_text()
-                if text.strip():
-                    text_parts.append(text)
-
-            doc.close()
+                text_parts: list[str] = []
+                for page_num in range(min(len(doc), 5)):  # Process up to 5 pages
+                    page = doc[page_num]
+                    text = str(page.get_text())
+                    if text.strip():
+                        text_parts.append(text)
 
             full_text = "\n\n".join(text_parts)
 
@@ -279,11 +332,11 @@ class OCRService:
             return full_text
 
         except Exception as e:
-            logger.warning(f"Direct PDF text extraction failed: {e}")
+            logger.warning("Direct PDF text extraction failed: %s", e)
             return None
 
     def _pdf_to_image(self, file_path: Path) -> Image.Image:
-        """Convert first page of PDF to image.
+        """Convert first page of PDF to an RGB PIL Image within the pixel budget.
 
         Args:
             file_path: Path to PDF file
@@ -292,24 +345,38 @@ class OCRService:
             PIL Image of the first page
         """
         try:
-            doc = fitz.open(file_path)
-            page = doc[0]  # First page
+            with fitz.open(file_path) as doc:
+                if len(doc) == 0:
+                    raise OCRProcessingError("PDF file contains no pages.")
 
-            # Render page to image
-            mat = fitz.Matrix(2, 2)  # 2x zoom for better OCR
-            pix = page.get_pixmap(matrix=mat)
+                page = doc[0]
+                rect = page.rect
+                if not (math.isfinite(rect.width) and math.isfinite(rect.height)):
+                    raise OCRProcessingError(
+                        f"PDF page has invalid dimensions: {rect.width}x{rect.height}."
+                    )
 
-            # Convert to PIL Image
-            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            doc.close()
+                rendered_width = math.ceil(rect.width * PDF_RENDER_SCALE)
+                rendered_height = math.ceil(rect.height * PDF_RENDER_SCALE)
+                self._validate_image_dimensions(rendered_width, rendered_height)
 
-            return img
+                mat = fitz.Matrix(PDF_RENDER_SCALE, PDF_RENDER_SCALE)
+                pix = page.get_pixmap(
+                    matrix=mat,
+                    alpha=False,
+                    colorspace=fitz.csRGB,
+                )
+                self._validate_image_dimensions(pix.width, pix.height)
+
+                return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        except OCRProcessingError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to convert PDF to image: {e}")
-            raise OCRProcessingError(f"Failed to process PDF: {e}")
+            logger.error("Failed to convert PDF to image: %s", e)
+            raise OCRProcessingError(f"Failed to process PDF: {e}") from e
 
     async def extract_from_path(self, file_path: Path) -> OCRResult:
-        """Extract text from image or PDF file path.
+        """Extract text from image or PDF file path without blocking the event loop.
 
         For PDFs: tries direct text extraction first, falls back to OCR if needed.
         For images: uses OCR directly.
@@ -320,22 +387,21 @@ class OCRService:
         Returns:
             OCRResult with extracted text
         """
-        # Check if file is PDF
         if file_path.suffix.lower() == ".pdf":
-            # Try direct text extraction first
-            direct_text = self._extract_text_from_pdf_direct(file_path)
+            direct_text = await asyncio.to_thread(
+                self._extract_text_from_pdf_direct, file_path
+            )
 
             if direct_text:
                 logger.info("PDF has embedded text, using direct extraction")
                 return self._process_extracted_text(direct_text)
-            else:
-                logger.info("PDF appears to be image-based, using OCR")
-                image = self._pdf_to_image(file_path)
-                return await self.extract_text_from_image(image)
 
-        # Regular image file
-        with open(file_path, "rb") as f:
-            return await self.extract_text(f)
+            logger.info("PDF appears to be image-based, using OCR")
+            image = await asyncio.to_thread(self._pdf_to_image, file_path)
+            return await self.extract_text_from_image(image)
+
+        image = await asyncio.to_thread(self._load_and_validate_image, file_path)
+        return await self.extract_text_from_image(image)
 
     def _process_extracted_text(self, text: str) -> OCRResult:
         """Process already-extracted text into OCRResult format.
@@ -382,10 +448,42 @@ class OCRService:
             average_confidence=avg_confidence,
         )
 
+    def _run_image_ocr(self, image: Image.Image, preprocess: bool) -> str:
+        """Validate dimensions, preprocess if enabled, and run Tesseract with timeout."""
+        self._validate_image_dimensions(*image.size)
+
+        if preprocess:
+            image = self._preprocess_image(image)
+
+        custom_config = r"--oem 3 --psm 6 -l " + self.lang
+        try:
+            full_text = str(
+                pytesseract.image_to_string(
+                    image,
+                    config=custom_config,
+                    timeout=self.timeout,
+                )
+            )
+        except pytesseract.TesseractError as e:
+            logger.error("Tesseract OCR execution failed: %s", e)
+            raise OCRProcessingError(f"OCR execution failed: {e}") from e
+        except RuntimeError as e:
+            logger.error("Tesseract OCR timed out after %ss: %s", self.timeout, e)
+            raise OCRProcessingError(
+                f"OCR timed out after {self.timeout} seconds."
+            ) from e
+
+        if not full_text.strip():
+            raise OCRProcessingError(
+                "No text extracted from image. Image may be blank or unreadable."
+            )
+
+        return full_text
+
     async def extract_text_from_image(
         self, image: Image.Image, preprocess: bool = True
     ) -> OCRResult:
-        """Extract text from PIL Image using OCR.
+        """Extract text from PIL Image using OCR without blocking the event loop.
 
         Args:
             image: PIL Image object
@@ -395,26 +493,18 @@ class OCRService:
             OCRResult with extracted text
         """
         try:
-            # Preprocess if enabled
-            if preprocess:
-                image = self._preprocess_image(image)
-
-            # Perform OCR
-            custom_config = r"--oem 3 --psm 6 -l " + self.lang
-            full_text = pytesseract.image_to_string(image, config=custom_config)
-
-            if not full_text.strip():
-                raise OCRProcessingError(
-                    "No text extracted from image. Image may be blank or unreadable."
-                )
-
+            full_text = await asyncio.to_thread(self._run_image_ocr, image, preprocess)
             return self._process_extracted_text(full_text)
 
         except OCRProcessingError:
             raise
+        except Image.DecompressionBombError as e:
+            raise OCRProcessingError(
+                f"Image exceeds maximum safe pixel limit: {e}"
+            ) from e
         except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            raise OCRProcessingError(f"Failed to extract text: {str(e)}")
+            logger.error("OCR extraction failed: %s", e)
+            raise OCRProcessingError(f"Failed to extract text: {str(e)}") from e
 
     def get_confidence_level(self, confidence: float) -> str:
         """Get confidence level description.
