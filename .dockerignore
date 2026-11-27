@@ -1,14 +1,68 @@
-.env .env.* !.env.example
+# Environment files (root and nested)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Local data and databases
 data/
-database.db *.db *.sqlite *.sqlite3
-uploads/ backup_json/ exam_images/
-*.jpg *.jpeg *.png *.gif *.pdf
-__pycache__/ *.py[cod]
-.pytest_cache/ .mypy_cache/ .ruff_cache/ htmlcov/ .coverage
-*.egg-info/ .venv/ venv/ env/ build/ dist/ *.egg
-.git/ .gitignore .gitattributes
-.vscode/ .idea/ .DS_Store
-openspec/ .atl/
+database.db
+*.db
+**/*.db
+*.sqlite
+**/*.sqlite
+*.sqlite3
+**/*.sqlite3
+
+# Uploaded, backup, and exam media directories
+uploads/
+backup_json/
+exam_images/
+
+# Media files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.pdf
+
+# Python bytecode and caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Virtual environments and Python build artifacts
+*.egg-info/
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# IDE, OS, and tooling directories
+.vscode/
+.idea/
+.DS_Store
+openspec/
+.atl/
+
+# Docs not required in container image
 README.es.md
+
+# Frontend dependencies and local build output
 frontend/node_modules/
 frontend/dist/
