@@ -57,8 +57,21 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # Start backend
-$UVICORN app.main:app --reload --port 8000 &
+$UVICORN app.main:app --reload --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
+
+# Wait until the backend accepts TCP connections (up to 10s) so Vite does not
+# hit ECONNREFUSED when proxying requests from already-open browser tabs.
+for _ in $(seq 1 50); do
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        break
+    fi
+    if (exec 3<>/dev/tcp/127.0.0.1/8000) 2>/dev/null; then
+        exec 3>&- 3<&-
+        break
+    fi
+    sleep 0.2
+done
 
 # Start frontend
 (cd frontend && bun run dev) &
