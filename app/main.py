@@ -1,14 +1,19 @@
 """FastAPI application entry point."""
 
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath
 from typing import AsyncGenerator
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api import api_router
 from app.config import get_settings
@@ -49,8 +54,169 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS
+# Security middleware — CSRF protection, CORS, and Trusted Host validation
 # ---------------------------------------------------------------------------
+# Starlette runs middleware in LIFO registration order (last added = outermost).
+# Request flow: TrustedHostMiddleware -> CORSMiddleware -> CSRFProtectionMiddleware -> routes.
+
+_CSRF_PROTECTED_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_ALLOWED_FETCH_SITES = frozenset({"same-origin", "same-site", "none"})
+
+
+def _canonical_origin(raw: str, *, allow_path: bool = False) -> str | None:
+    """Normalize an HTTP(S) origin string, returning None for invalid or null values."""
+    value = raw.strip()
+    if not value or value.lower() == "null":
+        return None
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return None
+    scheme = parsed.scheme.lower()
+    if scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    if not allow_path and (parsed.path or parsed.query or parsed.fragment):
+        return None
+    hostname = parsed.hostname
+    if not hostname:
+        return None
+    hostname = hostname.lower()
+    host_part = f"[{hostname}]" if ":" in hostname else hostname
+    default_port = 80 if scheme == "http" else 443
+    if port is None or port == default_port:
+        return f"{scheme}://{host_part}"
+    return f"{scheme}://{host_part}:{port}"
+
+
+class CSRFProtectionMiddleware:
+    """Defense-in-depth CSRF guard for mutating ``/api/*`` requests.
+
+    Blocks cross-origin drive-by form submissions and empty-body POSTs by
+    enforcing Fetch Metadata, Origin/Referer validation, and a non-empty
+    ``X-Requested-With`` custom header.
+    """
+
+    def __init__(self, app: ASGIApp, allowed_origins: Sequence[str] = ()) -> None:
+        self.app = app
+        normalized: set[str] = set()
+        for origin in allowed_origins:
+            if origin == "*":
+                continue
+            canonical = _canonical_origin(origin)
+            if canonical is not None:
+                normalized.add(canonical)
+        self.allowed_origins = frozenset(normalized)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "").upper()
+        path = scope.get("path", "")
+        if method not in _CSRF_PROTECTED_METHODS or not (
+            path == "/api" or path.startswith("/api/")
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+
+        # 1. Fetch Metadata check (when present)
+        fetch_sites = headers.getlist("sec-fetch-site")
+        if fetch_sites:
+            if len(fetch_sites) > 1 or any(
+                val.strip().lower() not in _ALLOWED_FETCH_SITES for val in fetch_sites
+            ):
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
+                    "CSRF check failed: disallowed Sec-Fetch-Site header.",
+                )
+                return
+
+        # Allowed origins for this request: configured CORS origins plus the
+        # request's own Host origin (already validated by TrustedHostMiddleware).
+        scheme = scope.get("scheme", "http")
+        host = headers.get("host", "").strip()
+        allowed_for_request = set(self.allowed_origins)
+        if host:
+            host_origin = _canonical_origin(f"{scheme}://{host}")
+            if host_origin is not None:
+                allowed_for_request.add(host_origin)
+
+        # 2. Origin check (when present)
+        origins = headers.getlist("origin")
+        if origins:
+            if len(origins) > 1:
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
+                    "CSRF check failed: multiple Origin headers.",
+                )
+                return
+            origin_canonical = _canonical_origin(origins[0], allow_path=False)
+            if origin_canonical is None or origin_canonical not in allowed_for_request:
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
+                    "CSRF check failed: untrusted Origin header.",
+                )
+                return
+        else:
+            # 3. Referer check (when Origin is absent and Referer is present)
+            referers = headers.getlist("referer")
+            if referers:
+                if len(referers) > 1:
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        "CSRF check failed: multiple Referer headers.",
+                    )
+                    return
+                referer_canonical = _canonical_origin(referers[0], allow_path=True)
+                if (
+                    referer_canonical is None
+                    or referer_canonical not in allowed_for_request
+                ):
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        "CSRF check failed: untrusted Referer header.",
+                    )
+                    return
+
+        # 4. Require non-empty X-Requested-With custom header
+        requested_with = headers.get("x-requested-with", "").strip()
+        if not requested_with:
+            await self._reject(
+                scope,
+                receive,
+                send,
+                "CSRF check failed: missing X-Requested-With header.",
+            )
+            return
+
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _reject(scope: Scope, receive: Receive, send: Send, detail: str) -> None:
+        response = JSONResponse(status_code=403, content={"detail": detail})
+        await response(scope, receive, send)
+
+
+app.add_middleware(
+    CSRFProtectionMiddleware,
+    allowed_origins=settings.cors_allowed_origins,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +224,11 @@ app.add_middleware(
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=settings.cors_allowed_methods,
     allow_headers=settings.cors_allowed_headers,
+)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.allowed_hosts,
 )
 
 # ---------------------------------------------------------------------------
@@ -188,7 +359,13 @@ class SPAStaticFiles(StaticFiles):
 @app.get("/app/{path:path}", include_in_schema=False)
 async def legacy_app_prefix(request: Request, path: str = "") -> RedirectResponse:
     """Old SPA URLs lived under /app; send them to the same path at the root."""
-    target = f"/{path}"
+    clean_path = path.lstrip("/\\")
+    if "\\" in clean_path or any(ord(ch) < 32 for ch in clean_path):
+        target = "/"
+    else:
+        candidate = f"/{clean_path}"
+        parsed = urlsplit(candidate)
+        target = candidate if not parsed.scheme and not parsed.netloc else "/"
     if request.url.query:
         target += f"?{request.url.query}"
     return RedirectResponse(url=target, status_code=308)

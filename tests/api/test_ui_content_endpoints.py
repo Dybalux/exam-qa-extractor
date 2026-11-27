@@ -540,7 +540,7 @@ async def spa_client(tmp_path: Path):
 
     api.mount("/", SPAStaticFiles(directory=tmp_path, html=True))
     async with AsyncClient(
-        transport=ASGITransport(app=api), base_url="http://test"
+        transport=ASGITransport(app=api), base_url="http://localhost"
     ) as c:
         yield c
 

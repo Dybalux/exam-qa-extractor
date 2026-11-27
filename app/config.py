@@ -35,11 +35,18 @@ class Settings(BaseSettings):
     debug: bool = False
     secret_key: str = "change-this-secret-key-in-production"
 
+    # Allowed Host headers — prevents DNS rebinding attacks
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "[::1]"]
+
     # CORS — override via env vars in production
     cors_allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
     cors_allow_credentials: bool = True
     cors_allowed_methods: list[str] = ["GET", "POST", "PATCH", "DELETE"]
-    cors_allowed_headers: list[str] = ["Authorization", "Content-Type"]
+    cors_allowed_headers: list[str] = [
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+    ]
 
     @property
     def upload_path(self) -> Path:

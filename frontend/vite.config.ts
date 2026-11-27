@@ -8,7 +8,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        // Preserve the browser's Host header (e.g. localhost:5173) so FastAPI's
+        // CSRF middleware sees Origin matching Host instead of a rewritten
+        // 127.0.0.1:8000 Host header (Vite defaults string proxies to changeOrigin: true).
+        changeOrigin: false,
+      },
     },
   },
   build: { outDir: 'dist' },

@@ -270,13 +270,20 @@ function errorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
+const CSRF_HEADERS = { 'X-Requested-With': 'XMLHttpRequest' } as const
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isForm = init?.body instanceof FormData
+  const headers = new Headers(init?.headers)
+  headers.set('X-Requested-With', 'XMLHttpRequest')
+  // For multipart bodies the browser must set the boundary itself.
+  if (!isForm && init?.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
   const res = await fetch(`/api/v1/ui${path}`, {
     credentials: 'same-origin',
-    // For multipart bodies the browser must set the boundary itself.
-    headers: isForm || !init?.body ? undefined : { 'Content-Type': 'application/json' },
     ...init,
+    headers,
   })
   if (!res.ok) {
     let message = `La solicitud falló (${res.status})`
@@ -376,7 +383,12 @@ export class ImportValidationError extends ApiError {
 async function importRequest<T>(file: File, confirm: boolean): Promise<T> {
   const body = new FormData()
   body.append('file', file)
-  const res = await fetch(`/api/v1/import${confirm ? '?confirm=true' : ''}`, { method: 'POST', body })
+  const res = await fetch(`/api/v1/import${confirm ? '?confirm=true' : ''}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: CSRF_HEADERS,
+    body,
+  })
   if (res.status === 413) throw new ApiError(413, 'El archivo es demasiado grande (máx. 10 MB).')
   const data = await res.json().catch(() => ({}))
   if (res.status === 400 && Array.isArray(data.validation_errors)) {
@@ -389,7 +401,11 @@ async function importRequest<T>(file: File, confirm: boolean): Promise<T> {
 export const backup = {
   /** Downloads the full database as a JSON file. */
   async download(): Promise<void> {
-    const res = await fetch('/api/v1/export', { method: 'POST' })
+    const res = await fetch('/api/v1/export', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: CSRF_HEADERS,
+    })
     if (!res.ok) throw new ApiError(res.status, `Error al exportar (HTTP ${res.status}).`)
     const url = URL.createObjectURL(await res.blob())
     const a = document.createElement('a')
